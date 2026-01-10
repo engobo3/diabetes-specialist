@@ -1,0 +1,467 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles } from 'lucide-react';
+
+const PatientDetails = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [patient, setPatient] = useState(null);
+    const [vitals, setVitals] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedVitalType, setSelectedVitalType] = useState('Glucose'); // 'Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'
+    const [forecast, setForecast] = useState(null);
+    const [analyzing, setAnalyzing] = useState(false);
+
+    const [prescriptions, setPrescriptions] = useState([]);
+
+    const fetchData = () => {
+        Promise.all([
+            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`).then(res => res.json()),
+            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`).then(res => res.json()),
+            fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`).then(res => res.json())
+        ])
+            .then(([patientData, vitalsData, prescriptionsData]) => {
+                setPatient(patientData);
+                setVitals(vitalsData);
+                setPrescriptions(prescriptionsData);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Error fetching data", err);
+                setLoading(false);
+            });
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [id]);
+
+    const handleAddVital = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        const baseVital = {
+            date: formData.get('date'),
+            type: selectedVitalType,
+        };
+
+        let specificData = {};
+        if (selectedVitalType === 'Glucose') {
+            specificData = {
+                category: 'Glucose',
+                subtype: formData.get('subtype'),
+                value: parseInt(formData.get('value'))
+            };
+        } else if (selectedVitalType === 'Blood Pressure') {
+            specificData = {
+                category: 'Blood Pressure',
+                systolic: parseInt(formData.get('systolic')),
+                diastolic: parseInt(formData.get('diastolic'))
+            };
+        } else if (selectedVitalType === 'Weight') {
+            specificData = {
+                category: 'Weight',
+                value: parseFloat(formData.get('value'))
+            };
+        } else if (selectedVitalType === 'Heart Rate') {
+            specificData = {
+                category: 'Heart Rate',
+                value: parseInt(formData.get('value'))
+            };
+        }
+
+        const newVital = { ...baseVital, ...specificData };
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newVital),
+            });
+
+            if (response.ok) {
+                fetchData();
+                e.target.reset();
+            } else {
+                alert('Erreur lors de l\'ajout de la lecture');
+            }
+        } catch (error) {
+            console.error('Error adding vital:', error);
+            alert('Erreur lors de l\'ajout de la lecture');
+        }
+    };
+
+    const handleAddPrescription = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        const newPrescription = {
+            patientId: id,
+            medication: formData.get('medication'),
+            dosage: formData.get('dosage'),
+            instructions: formData.get('instructions'),
+            date: formData.get('date') || new Date().toISOString().split('T')[0]
+        };
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPrescription),
+            });
+
+            if (response.ok) {
+                fetchData();
+                e.target.reset();
+            } else {
+                alert('Erreur lors de l\'ajout de l\'ordonnance');
+            }
+        } catch (error) {
+            console.error('Error adding prescription:', error);
+            alert('Erreur lors de l\'ajout de l\'ordonnance');
+        }
+    };
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Chargement des détails du patient...</div>;
+    if (!patient) return <div className="p-8 text-center text-red-500">Patient non trouvé</div>;
+
+    // Filter vitals for chart and list
+    // Filter vitals for chart and list
+    const filteredVitals = vitals?.readings
+        ?.filter(v => (v.category === selectedVitalType) || (!v.category && selectedVitalType === 'Glucose'))
+        ?.sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
+
+    const chartData = forecast ? [...filteredVitals, ...forecast.predictions] : [...filteredVitals];
+
+    const handleForecast = async () => {
+        if (filteredVitals.length < 3) {
+            alert("Pas assez de données pour l'analyse (minimum 3).");
+            return;
+        }
+
+        setAnalyzing(true);
+        try {
+            const history = filteredVitals.map(v => ({
+                date: v.date,
+                value: selectedVitalType === 'Blood Pressure' ? `${v.systolic}/${v.diastolic}` : (v.value || v.glucose)
+            })).slice(-10); // Check last 10 readings
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/forecast`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ history, type: selectedVitalType })
+            });
+
+            if (!response.ok) throw new Error("Forecast failed");
+
+            const data = await response.json();
+            setForecast(data);
+
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de l'analyse IA.");
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    const getVitalConfig = (type) => {
+        switch (type) {
+            case 'Glucose': return { color: '#3B82F6', unit: 'mg/dL', icon: Droplets };
+            case 'Blood Pressure': return { color: '#EF4444', unit: 'mmHg', icon: Activity };
+            case 'Weight': return { color: '#10B981', unit: 'kg', icon: Scale };
+            case 'Heart Rate': return { color: '#F59E0B', unit: 'bpm', icon: Heart };
+            default: return { color: '#6B7280', unit: '', icon: Activity };
+        }
+    };
+
+    const config = getVitalConfig(selectedVitalType);
+    const Icon = config.icon || Activity;
+
+    return (
+        <div className="min-h-screen bg-slate-50">
+            <nav className="bg-white border-b border-gray-200">
+                <div className="container flex items-center h-16 gap-4">
+                    <button onClick={() => navigate('/dashboard')} className="flex items-center text-gray-500 hover:text-primary transition-colors">
+                        <ArrowLeft className="w-5 h-5 mr-1" />
+                        Retour
+                    </button>
+                    <div className="text-xl font-bold text-primary">GlucoCare <span className="text-xs font-normal text-gray-500">/ Détails du Patient</span></div>
+                </div>
+            </nav>
+
+            <main className="container py-8">
+                {/* Header */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">{patient.name}</h1>
+                            <p className="text-gray-500">Âge: {patient.age} • Type de Diabète: {patient.type}</p>
+                        </div>
+                        <div className="text-right">
+                            <span className={`text-lg font-bold ${patient.status === 'Critical' ? 'text-red-600' : 'text-green-600'}`}>
+                                {patient.status === 'Critical' ? 'Critique' : 'Stable'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex space-x-1 bg-white p-1 rounded-lg border border-gray-200 mb-6 w-fit overflow-x-auto">
+                    {['Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'].map(type => (
+                        <button
+                            key={type}
+                            onClick={() => {
+                                setSelectedVitalType(type);
+                                setForecast(null);
+                            }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === type
+                                ? 'bg-blue-50 text-blue-700 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                }`}
+                        >
+                            {type === 'Blood Pressure' ? 'Tension' : type === 'Heart Rate' ? 'Rythme' : type === 'Weight' ? 'Poids' : type}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setSelectedVitalType('Prescriptions')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Prescriptions'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Ordonnances
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        {selectedVitalType === 'Prescriptions' ? (
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-6">Historique des Ordonnances</h3>
+                                {prescriptions.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {prescriptions.map(p => (
+                                            <div key={p.id} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                                                <div className="flex justify-between">
+                                                    <h4 className="font-bold text-gray-900">{p.medication} ({p.dosage})</h4>
+                                                    <span className="text-sm text-gray-500">{p.date}</span>
+                                                </div>
+                                                <p className="text-gray-600 mt-2 text-sm">{p.instructions}</p>
+                                                <div className="mt-2 text-xs text-blue-600 font-medium">Prescrit par {p.doctorName}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">Aucune ordonnance.</p>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Icon className="w-5 h-5" style={{ color: config.color }} />
+                                            Tendance - {selectedVitalType === 'Blood Pressure' ? 'Tension Artérielle' : selectedVitalType}
+                                        </div>
+                                        <button
+                                            onClick={handleForecast}
+                                            disabled={analyzing}
+                                            className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors border border-indigo-200"
+                                        >
+                                            <Sparkles size={14} className={analyzing ? "animate-spin" : ""} />
+                                            {analyzing ? "Analyse..." : "Analyser avec IA"}
+                                        </button>
+                                    </h3>
+
+                                    {forecast && (
+                                        <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-100 flex items-start gap-3">
+                                            <div className="bg-white p-2 rounded-full shadow-sm">
+                                                <Sparkles size={18} className="text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 text-sm">Analyse IA : {forecast.trend}</h4>
+                                                <p className="text-sm text-gray-600 mt-1">{forecast.insight}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="h-64 w-full">
+                                        {chartData.length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
+                                                    <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
+                                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                                    {selectedVitalType === 'Blood Pressure' ? (
+                                                        <>
+                                                            <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={2} dot={{ r: 4 }} name="Systolique" />
+                                                            <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={2} dot={{ r: 4 }} name="Diastolique" />
+                                                        </>
+                                                    ) : (
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'}
+                                                            stroke={config.color}
+                                                            strokeWidth={2}
+                                                            dot={(props) => {
+                                                                // Use custom dot to differentiate predicted values
+                                                                const { cx, cy, payload } = props;
+                                                                if (payload.type === 'predicted') {
+                                                                    return <circle cx={cx} cy={cy} r={4} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
+                                                                }
+                                                                return <circle cx={cx} cy={cy} r={4} fill={config.color} stroke="white" strokeWidth={2} />;
+                                                            }}
+                                                            activeDot={{ r: 6 }}
+                                                            strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
+                                                        // Note: Recharts doesn't easily support mixed dash arrays on a single line unless we separate data. 
+                                                        // For simplicity/robustness, we might need two lines or just show it all solid.
+                                                        // Correction: Let's split it into two lines if needed, OR just accept a solid line for now to keep it simple and robust. 
+                                                        // Actually, simpler is to just render the line. The dots distinguish it.
+                                                        />
+                                                    )}
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                                                Pas assez de données pour afficher le graphique
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* List */}
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200">
+                                                <th className="p-4 font-semibold text-gray-600 text-sm">Date</th>
+                                                <th className="p-4 font-semibold text-gray-600 text-sm">Détail</th>
+                                                <th className="p-4 font-semibold text-gray-600 text-sm">Valeur ({config.unit})</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredVitals.slice().reverse().map((reading, index) => (
+                                                <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-slate-50">
+                                                    <td className="p-4 text-gray-700 text-sm">{reading.date}</td>
+                                                    <td className="p-4 text-gray-500 text-sm">
+                                                        {selectedVitalType === 'Glucose' ? (reading.subtype || reading.type || 'Standard') : '-'}
+                                                    </td>
+                                                    <td className="p-4 font-medium text-gray-900">
+                                                        {selectedVitalType === 'Blood Pressure'
+                                                            ? `${reading.systolic}/${reading.diastolic}`
+                                                            : (reading.value || reading.glucose)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {filteredVitals.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="3" className="p-8 text-center text-gray-500 text-sm">Aucune donnée trouvée.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Add Form */}
+                    <div>
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
+                            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 text-blue-600">
+                                    <span className="text-xl font-light">+</span>
+                                </div>
+                                {selectedVitalType === 'Prescriptions' ? 'Nouvelle Ordonnance' : 'Ajouter une mesure'}
+                            </h2>
+
+                            {selectedVitalType === 'Prescriptions' ? (
+                                <form onSubmit={handleAddPrescription} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Médicament</label>
+                                        <input type="text" name="medication" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Ex: Metformine" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dosage</label>
+                                        <input type="text" name="dosage" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Ex: 500mg" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Instructions</label>
+                                        <textarea name="instructions" required rows="3" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="1 comprimé matin et soir..."></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                        <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />
+                                    </div>
+                                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                        Créer Ordonnance
+                                    </button>
+                                </form>
+                            ) : (
+                                <form onSubmit={handleAddVital} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                        <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />
+                                    </div>
+
+                                    {selectedVitalType === 'Glucose' && (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Moment</label>
+                                                <select name="subtype" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                                    <option value="Fasting">À Jeun</option>
+                                                    <option value="Post-Prandial">Post-Prandial</option>
+                                                    <option value="Random">Aléatoire</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Glucose (mg/dL)</label>
+                                                <input type="number" name="value" required min="0" max="1000" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="120" />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {selectedVitalType === 'Blood Pressure' && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Systolique</label>
+                                                <input type="number" name="systolic" required min="50" max="300" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="120" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Diastolique</label>
+                                                <input type="number" name="diastolic" required min="30" max="200" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="80" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedVitalType === 'Weight' && (
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Poids (kg)</label>
+                                            <input type="number" step="0.1" name="value" required min="0" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="75.5" />
+                                        </div>
+                                    )}
+
+                                    {selectedVitalType === 'Heart Rate' && (
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">BPM</label>
+                                            <input type="number" name="value" required min="0" max="300" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="72" />
+                                        </div>
+                                    )}
+
+                                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                        Enregistrer {selectedVitalType === 'Blood Pressure' ? 'la tension' : selectedVitalType === 'Heart Rate' ? 'le rythme' : selectedVitalType === 'Weight' ? 'le poids' : 'la mesure'}
+                                    </button>
+                                </form>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </main >
+        </div >
+    );
+};
+
+export default PatientDetails;

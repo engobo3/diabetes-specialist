@@ -1,0 +1,38 @@
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Production
+build
+dist
+
+# Environment Variables (SENSITIVE)
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+
+# Firebase
+.firebase
+.firebaserc
+
+# System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode
+.idea
+
+# Local Data (Optional - Keep this commented if you WANT to share mock data)
+# server/data/*.json

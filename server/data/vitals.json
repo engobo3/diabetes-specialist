@@ -1,0 +1,37 @@
+[
+  {
+    "patientId": 1,
+    "readings": [
+      {
+        "date": "2026-01-06",
+        "type": "Post-Prandial",
+        "glucose": 155
+      },
+      {
+        "date": "2026-01-02",
+        "glucose": 140,
+        "type": "Post-Meal"
+      },
+      {
+        "date": "2026-01-01",
+        "glucose": 110,
+        "type": "Fasting"
+      }
+    ]
+  },
+  {
+    "patientId": 2,
+    "readings": [
+      {
+        "date": "2026-01-01",
+        "glucose": 180,
+        "type": "Fasting"
+      },
+      {
+        "date": "2026-01-02",
+        "glucose": 220,
+        "type": "Post-Meal"
+      }
+    ]
+  }
+]

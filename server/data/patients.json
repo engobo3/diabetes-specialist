@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "age": 45,
+    "type": "Type 2",
+    "lastVisit": "2025-12-15",
+    "status": "Stable"
+  },
+  {
+    "id": 2,
+    "name": "John Smith",
+    "age": 32,
+    "type": "Type 1",
+    "lastVisit": "2025-12-28",
+    "status": "Attention Needed"
+  },
+  {
+    "id": 3,
+    "name": "Emily Johnson",
+    "age": 58,
+    "type": "Type 2",
+    "lastVisit": "2026-01-02",
+    "status": "Critical"
+  },
+  {
+    "id": 5,
+    "name": "",
+    "age": null,
+    "type": "Type 1",
+    "status": "Stable",
+    "lastVisit": "2026-01-06"
+  },
+  {
+    "id": 6,
+    "name": "",
+    "age": null,
+    "type": "Type 1",
+    "status": "Stable",
+    "lastVisit": "2026-01-06"
+  },
+  {
+    "id": 7,
+    "name": "Maria Garcia",
+    "age": 30,
+    "type": "Type 1",
+    "status": "Stable",
+    "lastVisit": "2026-01-06"
+  },
+  {
+    "name": "Test Migration",
+    "age": "30",
+    "type": "Type 1",
+    "status": "Stable",
+    "id": 8
+  },
+  {
+    "name": "",
+    "age": "",
+    "type": "Type 1",
+    "status": "Stable",
+    "id": 9
+  },
+  {
+    "name": "Fallback User Edited",
+    "age": "45",
+    "type": "Type 1",
+    "status": "Stable",
+    "id": 10
+  }
+]

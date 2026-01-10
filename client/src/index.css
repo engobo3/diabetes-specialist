@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0F766E;
+  --color-primary-light: #14B8A6;
+  --color-primary-dark: #0D9488;
+  --color-accent: #F97316;
+  --color-bg-body: #F8FAFC;
+  --color-bg-card: #FFFFFF;
+  --color-text-main: #1E293B;
+  --color-text-muted: #64748B;
+  --color-border: #E2E8F0;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  /* Keep variables for runtime usage in JS if needed, though Tailwind theme covers CSS */
+  --primary: #0F766E;
+  --primary-light: #14B8A6;
+  --primary-dark: #0D9488;
+  --accent: #F97316;
+  --bg-body: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --border: #E2E8F0;
+}
+
+/* Dark Mode Support (Basic) */
+/* Dark Mode Removed for Medical Light Theme Consistency */
+
+body {
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  @apply antialiased;
+  font-family: var(--font-sans);
+}
+
+/* Component Classes */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-md font-medium transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white shadow-sm hover:bg-primary-dark hover:-translate-y-px;
+  }
+
+  .card {
+    @apply bg-bg-card rounded-lg p-6 shadow-md border border-border;
+  }
+}

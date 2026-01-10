@@ -1,0 +1,199 @@
+[
+    {
+        "id": 1,
+        "name": "Dr. Sarah Connor",
+        "specialty": "Endocrinologist",
+        "bio": "Dr. Sarah Connor is a leading expert in Type 1 Diabetes management with over 15 years of experience. She is dedicated to helping patients achieve their best health through personalized care and advanced technology.",
+        "education": [
+            "MD, Harvard Medical School",
+            "Residency, Johns Hopkins Hospital",
+            "Fellowship in Endocrinology, Mayo Clinic"
+        ],
+        "contact": {
+            "email": "sarah.connor@glucocare.com",
+            "phone": "+1 (555) 123-4567",
+            "address": "123 Medical Center Dr, Suite 100, Metropolis"
+        },
+        "languages": [
+            "English",
+            "French",
+            "Spanish"
+        ],
+        "image": "https://randomuser.me/api/portraits/women/68.jpg",
+        "role": "admin"
+    },
+    {
+        "id": 2,
+        "name": "Dr. John Kim",
+        "specialty": "Pediatric Diabetologist",
+        "bio": "Dr. Kim specializes in treating children and adolescents with diabetes. His compassionate approach helps young patients and their families navigate the challenges of diabetes.",
+        "education": [
+            "MD, Stanford University School of Medicine",
+            "Pediatric Residency, Children's Hospital Philadelphia"
+        ],
+        "contact": {
+            "email": "john.kim@glucocare.com",
+            "phone": "+1 (555) 987-6543",
+            "address": "123 Medical Center Dr, Suite 102, Metropolis"
+        },
+        "languages": [
+            "English",
+            "Korean"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/32.jpg",
+        "role": "doctor"
+    },
+    {
+        "id": 3,
+        "name": "Dr. Emily Chen",
+        "specialty": "Cardiologist",
+        "bio": "Dr. Chen focuses on cardiovascular health in diabetic patients. She leads the Heart Health initiative at GlucoCare.",
+        "education": [
+            "MD, UCSF",
+            "Fellowship, Cleveland Clinic"
+        ],
+        "contact": {
+            "email": "emily.chen@glucocare.com",
+            "phone": "+1 (555) 222-3333",
+            "address": "123 Medical Center Dr, Suite 200"
+        },
+        "languages": [
+            "English",
+            "Mandarin"
+        ],
+        "image": "https://randomuser.me/api/portraits/women/44.jpg"
+    },
+    {
+        "id": 4,
+        "name": "Dr. Michael Ross",
+        "specialty": "Nephrologist",
+        "bio": "Specializing in kidney health, Dr. Ross works closely with diabetic patients to prevent and manage complications.",
+        "education": [
+            "MD, Yale School of Medicine"
+        ],
+        "contact": {
+            "email": "michael.ross@glucocare.com",
+            "phone": "+1 (555) 444-5555",
+            "address": "123 Medical Center Dr, Suite 205"
+        },
+        "languages": [
+            "English"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/86.jpg"
+    },
+    {
+        "id": 5,
+        "name": "Lisa Wong, RD",
+        "specialty": "Nutritionist",
+        "bio": "Lisa is a Certified Diabetes Educator and Registered Dietitian who loves helping patients find joy in healthy eating.",
+        "education": [
+            "MS Nutrition, Boston University"
+        ],
+        "contact": {
+            "email": "lisa.wong@glucocare.com",
+            "phone": "+1 (555) 666-7777",
+            "address": "123 Medical Center Dr, Suite 300"
+        },
+        "languages": [
+            "English",
+            "Cantonese"
+        ],
+        "image": "https://randomuser.me/api/portraits/women/22.jpg"
+    },
+    {
+        "id": 6,
+        "name": "Dr. Robert Mueller",
+        "specialty": "Opthalmologist",
+        "bio": "Dr. Mueller provides comprehensive eye care, focusing on diabetic retinopathy screening and treatment.",
+        "education": [
+            "MD, Johns Hopkins"
+        ],
+        "contact": {
+            "email": "robert.mueller@glucocare.com",
+            "phone": "+1 (555) 888-9999",
+            "address": "123 Medical Center Dr, Suite 400"
+        },
+        "languages": [
+            "English",
+            "German"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/11.jpg"
+    },
+    {
+        "id": 7,
+        "name": "Dr. Anita Patel",
+        "specialty": "Endocrinologist",
+        "bio": "Dr. Patel has a special interest in gestational diabetes and thyroid disorders.",
+        "education": [
+            "MD, Baylor College of Medicine"
+        ],
+        "contact": {
+            "email": "anita.patel@glucocare.com",
+            "phone": "+1 (555) 121-2121",
+            "address": "123 Medical Center Dr, Suite 101"
+        },
+        "languages": [
+            "English",
+            "Hindi",
+            "Gujarati"
+        ],
+        "image": "https://randomuser.me/api/portraits/women/55.jpg"
+    },
+    {
+        "id": 8,
+        "name": "James Wilson, NP",
+        "specialty": "Primary Care",
+        "bio": "James is a Nurse Practitioner dedicated to accessible primary care and preventive medicine.",
+        "education": [
+            "MSN, University of Washington"
+        ],
+        "contact": {
+            "email": "james.wilson@glucocare.com",
+            "phone": "+1 (555) 343-4343",
+            "address": "456 Community Clinic Way"
+        },
+        "languages": [
+            "English",
+            "Spanish"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/76.jpg"
+    },
+    {
+        "id": 9,
+        "name": "Dr. Sofia Garcia",
+        "specialty": "Psychologist",
+        "bio": "Dr. Garcia helps patients manage the emotional and mental health aspects of living with chronic conditions.",
+        "education": [
+            "PhD, UC Berkeley"
+        ],
+        "contact": {
+            "email": "sofia.garcia@glucocare.com",
+            "phone": "+1 (555) 909-0909",
+            "address": "123 Medical Center Dr, Suite 500"
+        },
+        "languages": [
+            "English",
+            "Spanish"
+        ],
+        "image": "https://randomuser.me/api/portraits/women/90.jpg"
+    },
+    {
+        "id": 10,
+        "name": "Dr. David Okafor",
+        "specialty": "Podiatrist",
+        "bio": "Dr. Okafor specializes in foot care, wound healing, and limb preservation for diabetic patients.",
+        "education": [
+            "DPM, Temple University"
+        ],
+        "contact": {
+            "email": "david.okafor@glucocare.com",
+            "phone": "+1 (555) 565-6565",
+            "address": "123 Medical Center Dr, Suite 105"
+        },
+        "languages": [
+            "English",
+            "Igbo"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/45.jpg"
+    }
+]
