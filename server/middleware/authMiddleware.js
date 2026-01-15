@@ -17,11 +17,10 @@ const verifyToken = async (req, res, next) => {
             res.status(403).json({ message: 'Forbidden: Invalid Token' });
         }
     } else {
-        // Just continue for now to avoid breaking existing local dev flow if frontend doesn't send token yet
-        // In production, this should return 403
-        // res.status(403).json({ message: 'Forbidden: No Token Provided' });
-        console.warn('WARNING: No token provided. Proceeding unauthenticated (Development Mode).');
-        next();
+        // Enforce 403 for missing token in production/testing
+        res.status(403).json({ message: 'Forbidden: No Token Provided' });
+        // console.warn('WARNING: No token provided. Proceeding unauthenticated (Development Mode).');
+        // next();
     }
 };
 

@@ -1,5 +1,6 @@
 {
     "hosting": {
+        "site": "diabetes-specialist",
         "public": "client/dist",
         "ignore": [
             "firebase.json",

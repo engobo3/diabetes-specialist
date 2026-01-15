@@ -16,6 +16,59 @@ const readLocalData = () => {
     }
 };
 
+const doctorsPath = path.join(__dirname, '../data/doctors.json');
+const getLocalDoctors = () => {
+    try {
+        if (!fs.existsSync(doctorsPath)) return [];
+        const data = fs.readFileSync(doctorsPath, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        console.error('Error reading local doctors:', e);
+        return [];
+    }
+};
+
+// Helper: Attach Doctor Info to Patient
+const attachDoctorInfo = async (patient) => {
+    if (!patient) return null;
+    try {
+        const doctorId = patient.doctorId || 1;
+        let doctor = null;
+
+        // Try getting doctor from Firestore first
+        if (db) {
+            try {
+                const docSnap = await db.collection('doctors').doc(String(doctorId)).get();
+                if (docSnap.exists) {
+                    doctor = { id: docSnap.id, ...docSnap.data() };
+                }
+            } catch (fsError) {
+                console.warn("Firestore Doctor look up failed, falling back to local:", fsError.message);
+            }
+        }
+
+        // Fallback to local if not found in DB
+        if (!doctor) {
+            const doctors = getLocalDoctors();
+            doctor = doctors.find(d => String(d.id) === String(doctorId));
+        }
+
+        if (doctor) {
+            return {
+                ...patient,
+                doctorName: doctor.name,
+                doctorPhoto: doctor.photo || doctor.image || null,
+                doctorSpecialty: doctor.specialty
+            };
+        }
+        return patient;
+    } catch (error) {
+        console.warn("Error attaching doctor info:", error);
+        return patient;
+    }
+};
+
+
 const writeLocalData = (data) => {
     try {
         fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
@@ -32,6 +85,8 @@ const getPatients = async () => {
             console.log('Fetching patients from Firestore...');
             try {
                 const snapshot = await db.collection('patients').get();
+                // We should also look up doctors here for each patient, but for list view it might be heavy.
+                // However, let's keep it simple for now and only attach detail on single fetch.
                 return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
@@ -49,18 +104,25 @@ const getPatients = async () => {
 
 // --- Appointment Operations ---
 
-const getAppointments = async () => {
+const getAppointments = async (doctorId) => {
     try {
         if (db) {
             try {
-                const snapshot = await db.collection('appointments').get();
+                let query = db.collection('appointments');
+                if (doctorId) {
+                    // Try comparing as number first (legacy), then string if needed, or just string.
+                    // safely handle both by not using strict equality in where if possible? No, Firestore is strict.
+                    // Let's assume we store as Number for now based on other IDs.
+                    query = query.where('doctorId', '==', parseInt(doctorId) || doctorId);
+                }
+                const snapshot = await query.get();
                 return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
-                return getLocalAppointments();
+                return getLocalAppointments(doctorId);
             }
         } else {
-            return getLocalAppointments();
+            return getLocalAppointments(doctorId);
         }
     } catch (error) {
         console.error('Error in getAppointments:', error);
@@ -87,32 +149,39 @@ const createAppointment = async (appointmentData) => {
     }
 };
 
-const updateAppointmentStatus = async (id, status) => {
+const updateAppointment = async (id, updateData) => {
     try {
         if (db) {
             try {
-                await db.collection('appointments').doc(String(id)).update({ status });
-                return { id, status };
+                // Determine if updateData is just status or full object
+                // If it came from legacy call it might be just status?
+                // But we control the controller.
+                await db.collection('appointments').doc(String(id)).update(updateData);
+                return { id, ...updateData };
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
-                return updateLocalAppointmentStatus(id, status);
+                return updateLocalAppointment(id, updateData);
             }
         } else {
-            return updateLocalAppointmentStatus(id, status);
+            return updateLocalAppointment(id, updateData);
         }
     } catch (error) {
-        console.error('Error in updateAppointmentStatus:', error);
+        console.error('Error in updateAppointment:', error);
         throw error;
     }
 };
 
 const appointmentsPath = path.join(__dirname, '../data/appointments.json');
 
-const getLocalAppointments = () => {
+const getLocalAppointments = (doctorId) => {
     try {
         if (!fs.existsSync(appointmentsPath)) return [];
         const data = fs.readFileSync(appointmentsPath, 'utf8');
-        return JSON.parse(data);
+        let appointments = JSON.parse(data);
+        if (doctorId) {
+            appointments = appointments.filter(a => String(a.doctorId) === String(doctorId));
+        }
+        return appointments;
     } catch (e) {
         console.error('Error reading local appointments:', e);
         return [];
@@ -133,13 +202,13 @@ const createLocalAppointment = (data) => {
     return newAppointment;
 };
 
-const updateLocalAppointmentStatus = (id, status) => {
+const updateLocalAppointment = (id, updateData) => {
     let appointments = getLocalAppointments();
     const index = appointments.findIndex(a => String(a.id) === String(id));
 
     if (index === -1) return null;
 
-    appointments[index].status = status;
+    appointments[index] = { ...appointments[index], ...updateData };
     try {
         fs.writeFileSync(appointmentsPath, JSON.stringify(appointments, null, 2));
     } catch (e) {
@@ -157,13 +226,23 @@ const getMessages = async (contactId) => {
         if (db) {
             try {
                 // If contactId provided, filter by it (either sender or receiver)
-                // Firestore queries for OR conditions are tricky, usually need separate queries or client-side filter
-                // specific to this simple app use case.
                 const snapshot = await db.collection('messages').orderBy('timestamp', 'asc').get();
                 let messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 if (contactId) {
-                    messages = messages.filter(m => m.senderId === String(contactId) || m.receiverId === String(contactId));
+                    // Smart Filter: Check if contactId refers to a patient with a known UID
+                    let targetIds = [String(contactId)];
+                    try {
+                        const patientDoc = await db.collection('patients').doc(String(contactId)).get();
+                        if (patientDoc.exists && patientDoc.data().uid) {
+                            targetIds.push(patientDoc.data().uid);
+                        }
+                    } catch (e) { /* ignore lookup error */ }
+
+                    // Look for messages matching ANY of the target IDs (Database ID or Firebase UID)
+                    messages = messages.filter(m =>
+                        targetIds.includes(String(m.senderId)) || targetIds.includes(String(m.receiverId))
+                    );
                 }
                 return messages;
             } catch (fsError) {
@@ -179,21 +258,23 @@ const getMessages = async (contactId) => {
     }
 };
 
-const createMessage = async (messageData) => {
+const saveMessage = async (messageData) => {
     try {
         if (db) {
             try {
+                // Ensure timestamp is a Date object or server timestamp if possible, but for simplicity here use ISO string or Date
+                // The frontend sends timestamp usually.
                 const docRef = await db.collection('messages').add(messageData);
                 return { id: docRef.id, ...messageData };
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
-                return createLocalMessage(messageData);
+                return saveLocalMessage(messageData);
             }
         } else {
-            return createLocalMessage(messageData);
+            return saveLocalMessage(messageData);
         }
     } catch (error) {
-        console.error('Error in createMessage:', error);
+        console.error('Error in saveMessage:', error);
         throw error;
     }
 };
@@ -205,9 +286,8 @@ const getLocalMessages = (contactId) => {
         if (!fs.existsSync(messagesPath)) return [];
         const data = fs.readFileSync(messagesPath, 'utf8');
         let messages = JSON.parse(data);
-
         if (contactId) {
-            messages = messages.filter(m => m.senderId === String(contactId) || m.receiverId === String(contactId));
+            messages = messages.filter(m => String(m.senderId) === String(contactId) || String(m.receiverId) === String(contactId));
         }
         return messages;
     } catch (e) {
@@ -216,25 +296,29 @@ const getLocalMessages = (contactId) => {
     }
 };
 
-const createLocalMessage = (data) => {
-    const messages = getLocalMessages(); // Get all to append
-    // Re-read all to ensure we have full list for ID gen
-    let allMessages = [];
-    if (fs.existsSync(messagesPath)) {
-        allMessages = JSON.parse(fs.readFileSync(messagesPath, 'utf8'));
+const saveLocalMessage = (messageData) => {
+    let messages = [];
+    try {
+        if (fs.existsSync(messagesPath)) {
+            const data = fs.readFileSync(messagesPath, 'utf8');
+            messages = JSON.parse(data);
+        }
+    } catch (e) {
+        // ignore
     }
 
-    const newId = allMessages.length > 0 ? Math.max(...allMessages.map(m => parseInt(m.id) || 0)) + 1 : 1;
-    const newMessage = { ...data, id: newId };
+    const newMessage = { id: Date.now().toString(), ...messageData };
+    messages.push(newMessage);
 
-    allMessages.push(newMessage);
     try {
-        fs.writeFileSync(messagesPath, JSON.stringify(allMessages, null, 2));
+        fs.writeFileSync(messagesPath, JSON.stringify(messages, null, 2));
     } catch (e) {
         console.error('Error writing local messages:', e);
     }
     return newMessage;
 };
+
+
 
 
 
@@ -317,18 +401,45 @@ const getPatientByEmail = async (email) => {
                 const snapshot = await db.collection('patients').where('email', '==', email).limit(1).get();
                 if (snapshot.empty) return null;
                 const doc = snapshot.docs[0];
-                return { id: doc.id, ...doc.data() };
+                return await attachDoctorInfo({ id: doc.id, ...doc.data() });
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
                 const patients = readLocalData();
-                return patients.find(p => p.email === email);
+                const patient = patients.find(p => p.email === email);
+                return await attachDoctorInfo(patient);
             }
         } else {
             const patients = readLocalData();
-            return patients.find(p => p.email === email);
+            const patient = patients.find(p => p.email === email);
+            return await attachDoctorInfo(patient);
         }
     } catch (error) {
         console.error('Error in getPatientByEmail:', error);
+        throw error;
+    }
+};
+
+const getPatientByPhone = async (phone) => {
+    try {
+        if (db) {
+            try {
+                const snapshot = await db.collection('patients').where('phone', '==', phone).limit(1).get();
+                if (snapshot.empty) return null;
+                const doc = snapshot.docs[0];
+                return await attachDoctorInfo({ id: doc.id, ...doc.data() });
+            } catch (fsError) {
+                console.error('Firestore Error (Fallback to Local):', fsError.message);
+                const patients = readLocalData();
+                const patient = patients.find(p => p.phone === phone);
+                return await attachDoctorInfo(patient);
+            }
+        } else {
+            const patients = readLocalData();
+            const patient = patients.find(p => p.phone === phone);
+            return await attachDoctorInfo(patient);
+        }
+    } catch (error) {
+        console.error('Error in getPatientByPhone:', error);
         throw error;
     }
 };
@@ -339,15 +450,17 @@ const getPatientById = async (id) => {
             try {
                 const doc = await db.collection('patients').doc(String(id)).get();
                 if (!doc.exists) return null;
-                return { id: doc.id, ...doc.data() };
+                return await attachDoctorInfo({ id: doc.id, ...doc.data() });
             } catch (fsError) {
                 console.error('Firestore Error (Fallback to Local):', fsError.message);
                 const patients = readLocalData();
-                return patients.find(p => String(p.id) === String(id));
+                const patient = patients.find(p => String(p.id) === String(id));
+                return await attachDoctorInfo(patient);
             }
         } else {
             const patients = readLocalData();
-            return patients.find(p => String(p.id) === String(id));
+            const patient = patients.find(p => String(p.id) === String(id));
+            return await attachDoctorInfo(patient);
         }
     } catch (error) {
         console.error('Error in getPatientById:', error);
@@ -639,23 +752,80 @@ const createLocalPayment = (data) => {
     return newPayment;
 };
 
+const getPatientDocuments = async (patientId) => {
+    try {
+        if (db) {
+            try {
+                // Get from sub-collection
+                const snapshot = await db.collection('patients').doc(String(patientId)).collection('documents').orderBy('date', 'desc').get();
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (fsError) {
+                console.error('Firestore Error (Fallback to Local):', fsError.message);
+                const patients = readLocalData();
+                const p = patients.find(p => String(p.id) === String(patientId));
+                return p?.documents || [];
+            }
+        } else {
+            const patients = readLocalData();
+            const p = patients.find(p => String(p.id) === String(patientId));
+            return p?.documents || [];
+        }
+    } catch (error) {
+        console.error('Error fetching documents:', error);
+        return [];
+    }
+};
+
+const addPatientDocument = async (patientId, docData) => {
+    try {
+        if (db) {
+            try {
+                const docRef = await db.collection('patients').doc(String(patientId)).collection('documents').add(docData);
+                return { id: docRef.id, ...docData };
+            } catch (fsError) {
+                console.error('Firestore Error (Fallback to Local):', fsError.message);
+                return addLocalPatientDocument(patientId, docData);
+            }
+        } else {
+            return addLocalPatientDocument(patientId, docData);
+        }
+    } catch (error) {
+        console.error('Error adding document:', error);
+        throw error;
+    }
+};
+
+const addLocalPatientDocument = (patientId, docData) => {
+    let patients = readLocalData();
+    const index = patients.findIndex(p => String(p.id) === String(patientId));
+    if (index === -1) throw new Error("Patient not found");
+
+    const newDoc = { id: Date.now().toString(), ...docData };
+
+    if (!patients[index].documents) patients[index].documents = [];
+    patients[index].documents.push(newDoc);
+
+    writeLocalData(patients);
+    return newDoc;
+};
+
 module.exports = {
     getPatients,
     getPatientById,
     getPatientByEmail,
+    getVitals,
+    addVital,
     createPatient,
     updatePatient,
     deletePatient,
-    migrateToFirestore,
-    getVitals,
-    addVital,
     getAppointments,
     createAppointment,
-    updateAppointmentStatus,
+    updateAppointment,
     getMessages,
-    createMessage,
-    getPrescriptions,
-    createPrescription,
+    saveMessage,
     getPayments,
-    createPayment
+    createPayment,
+    attachDoctorInfo,
+    getPatientDocuments,
+    addPatientDocument
 };

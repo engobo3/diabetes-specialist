@@ -6,7 +6,7 @@ import Input from './ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { useAuth } from '../context/AuthContext';
 
-const PaymentForm = ({ onSuccess }) => {
+const PaymentForm = ({ onSuccess, doctorId }) => {
     const { currentUser, patientId } = useAuth();
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState('CDF'); // CDF or USD
@@ -46,6 +46,7 @@ const PaymentForm = ({ onSuccess }) => {
                 },
                 body: JSON.stringify({
                     patientId,
+                    doctorId,
                     amount,
                     currency,
                     method,
@@ -103,8 +104,8 @@ const PaymentForm = ({ onSuccess }) => {
                                         type="button"
                                         onClick={() => setCurrency(curr)}
                                         className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${currency === curr
-                                                ? 'bg-white text-primary shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
+                                            ? 'bg-white text-primary shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
                                             }`}
                                     >
                                         {curr}
@@ -130,8 +131,8 @@ const PaymentForm = ({ onSuccess }) => {
                                     type="button"
                                     onClick={() => setMethod(m.id)}
                                     className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border transition-all ${method === m.id
-                                            ? 'border-primary bg-primary/5 text-primary'
-                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                        ? 'border-primary bg-primary/5 text-primary'
+                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                                         }`}
                                 >
                                     <m.icon size={20} />

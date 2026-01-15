@@ -7,6 +7,8 @@ function EditPatient() {
     const [formData, setFormData] = useState({
         name: '',
         age: '',
+        phone: '',
+        email: '',
         type: 'Type 1',
         status: 'Stable'
     });
@@ -21,6 +23,8 @@ function EditPatient() {
                     setFormData({
                         name: data.name,
                         age: data.age,
+                        phone: data.phone || '',
+                        email: data.email || '',
                         type: data.type || 'Type 1',
                         status: data.status || 'Stable'
                     });
@@ -93,6 +97,36 @@ function EditPatient() {
                             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary"
                             required
                         />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="phone">
+                                Téléphone
+                            </label>
+                            <input
+                                type="text"
+                                id="phone"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="ex: 099..."
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+                                Email (Optionnel)
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary"
+                            />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

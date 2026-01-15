@@ -14,12 +14,15 @@ const PatientDetails = lazy(() => import('./pages/PatientDetails'));
 const AddPatient = lazy(() => import('./pages/AddPatient'));
 const EditPatient = lazy(() => import('./pages/EditPatient'));
 const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
 const DoctorMessaging = lazy(() => import('./pages/DoctorMessaging'));
 const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
 const FindDoctor = lazy(() => import('./pages/FindDoctor'));
 const AddDoctor = lazy(() => import('./pages/AddDoctor'));
 const EditDoctor = lazy(() => import('./pages/EditDoctor'));
+const PaymentTerminal = lazy(() => import('./pages/PaymentTerminal'));
+const Specialties = lazy(() => import('./pages/Specialties'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -72,11 +75,14 @@ function App() {
                         <Routes>
                             <Route path="/" element={<LandingPage />} />
                             <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route path="/specialties" element={<Specialties />} />
                             <Route path="/find-doctor" element={<FindDoctor />} />
                             <Route path="/add-doctor" element={<ProtectedRoute><AddDoctor /></ProtectedRoute>} />
                             <Route path="/edit-doctor/:id" element={<ProtectedRoute><EditDoctor /></ProtectedRoute>} />
                             <Route path="/doctor/:id" element={<DoctorProfile />} />
                             <Route path="/messaging" element={<ProtectedRoute><DoctorMessaging /></ProtectedRoute>} />
+                            <Route path="/terminal" element={<ProtectedRoute><PaymentTerminal /></ProtectedRoute>} />
                             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                             <Route path="/portal" element={<ProtectedRoute><PatientPortal /></ProtectedRoute>} />
                             <Route path="/add-patient" element={<ProtectedRoute><AddPatient /></ProtectedRoute>} />

@@ -1,8 +1,9 @@
-const { getAppointments, createAppointment, updateAppointmentStatus } = require('../services/database');
+const { getAppointments, createAppointment, updateAppointment } = require('../services/database');
 
 const getAllAppointments = async (req, res) => {
     try {
-        const appointments = await getAppointments();
+        const { doctorId } = req.query;
+        const appointments = await getAppointments(doctorId);
         res.json(appointments);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching appointments' });
@@ -12,7 +13,7 @@ const getAllAppointments = async (req, res) => {
 const createNewAppointment = async (req, res) => {
     try {
         // Validate required fields (basic)
-        const { patientId, patientName, date, time, reason } = req.body;
+        const { patientId, patientName, doctorId, date, time, reason } = req.body;
         if (!patientId || !date || !time) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
@@ -20,6 +21,7 @@ const createNewAppointment = async (req, res) => {
         const appointment = await createAppointment({
             patientId,
             patientName,
+            doctorId,
             date,
             time,
             reason,
@@ -31,14 +33,20 @@ const createNewAppointment = async (req, res) => {
     }
 };
 
-const updateStatus = async (req, res) => {
+const updateAppointmentDetails = async (req, res) => {
     try {
-        const { status } = req.body;
-        if (!['confirmed', 'rejected'].includes(status)) {
-            return res.status(400).json({ message: 'Invalid status' });
+        const { status, notes } = req.body;
+        // Validate inputs if needed
+        const updateData = {};
+        if (status) {
+            if (!['confirmed', 'rejected', 'completed', 'pending'].includes(status)) {
+                return res.status(400).json({ message: 'Invalid status' });
+            }
+            updateData.status = status;
         }
+        if (notes !== undefined) updateData.notes = notes;
 
-        const updated = await updateAppointmentStatus(req.params.id, status);
+        const updated = await updateAppointment(req.params.id, updateData);
         if (!updated) {
             return res.status(404).json({ message: 'Appointment not found' });
         }
@@ -51,5 +59,5 @@ const updateStatus = async (req, res) => {
 module.exports = {
     getAllAppointments,
     createNewAppointment,
-    updateStatus
+    updateAppointmentDetails
 };

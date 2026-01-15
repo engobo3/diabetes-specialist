@@ -6,30 +6,40 @@ import { Card, CardContent } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import Skeleton from '../components/ui/Skeleton';
-import { MessageSquare, Plus, Trash2, Edit, ChevronRight, Calendar, User, Activity } from 'lucide-react'; // Assuming lucide-react is installed
+import { MessageSquare, Plus, Trash2, Edit, ChevronRight, Calendar, User, Activity, LogOut, Banknote, CreditCard } from 'lucide-react'; // Assuming lucide-react is installed
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
     const queryClient = useQueryClient();
-    const { userRole } = useAuth();
+    const { userRole, doctorProfile } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
 
     // Fetch Patients
     const { data: patients = [], isLoading: loadingPatients } = useQuery({
-        queryKey: ['patients'],
-        queryFn: () => fetch(`${import.meta.env.VITE_API_URL}/api/patients`).then(res => {
-            if (!res.ok) throw new Error('Network response was not ok');
-            return res.json();
-        }),
+        queryKey: ['patients', doctorProfile?.id],
+        queryFn: () => {
+            if (!doctorProfile?.id) return [];
+            return fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                });
+        },
+        enabled: !!doctorProfile?.id,
     });
 
     // Fetch Appointments
     const { data: appointments = [], isLoading: loadingApts } = useQuery({
-        queryKey: ['appointments'],
-        queryFn: () => fetch(`${import.meta.env.VITE_API_URL}/api/appointments`).then(res => {
-            if (!res.ok) throw new Error('Network response was not ok');
-            return res.json();
-        }),
+        queryKey: ['appointments', doctorProfile?.id],
+        queryFn: () => {
+            if (!doctorProfile?.id) return [];
+            return fetch(`${import.meta.env.VITE_API_URL}/api/appointments?doctorId=${doctorProfile.id}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                });
+        },
+        enabled: !!doctorProfile?.id,
     });
 
     const loading = loadingPatients || loadingApts;
@@ -65,6 +75,7 @@ const Dashboard = () => {
     };
 
     const pendingAppointments = appointments.filter(a => a.status === 'pending');
+    const confirmedAppointments = appointments.filter(a => a.status === 'confirmed');
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
@@ -74,13 +85,46 @@ const Dashboard = () => {
                         <Activity className="text-primary" size={24} /> GlucoSoin <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Tableau de Bord</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium text-gray-700 hidden sm:block">Dr. Spécialiste</span>
-                        <div className="w-9 h-9 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-bold border border-primary/20">DR</div>
+                        <span className="text-sm font-medium text-gray-700 hidden sm:block">
+                            {doctorProfile ? doctorProfile.name : "Dr. Spécialiste"}
+                        </span>
+                        <div className="w-9 h-9 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-bold border border-primary/20 overflow-hidden">
+                            {doctorProfile?.photo ? (
+                                <img src={doctorProfile.photo} alt={doctorProfile.name} className="w-full h-full object-cover" />
+                            ) : (
+                                "DR"
+                            )}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={useAuth().logout}
+                            className="text-gray-500 hover:text-red-500 ml-2"
+                            title="Déconnexion"
+                        >
+                            <LogOut size={18} />
+                        </Button>
                     </div>
                 </div>
             </nav>
 
             <main className="container py-8 space-y-8">
+                {/* Revenue Section */}
+                {doctorProfile && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Revenu Total</h2>
+                            <div className="text-3xl font-bold text-gray-900 mt-1">
+                                {(doctorProfile.totalRevenue || 0).toLocaleString('fr-CD', { style: 'currency', currency: 'CDF' })}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">Part Médecin (90%)</p>
+                        </div>
+                        <div className="bg-green-50 p-4 rounded-full">
+                            <Banknote size={32} className="text-green-600" />
+                        </div>
+                    </div>
+                )}
+
                 {/* Appointment Requests Section */}
                 <div>
                     <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -134,6 +178,50 @@ const Dashboard = () => {
                     )}
                 </div>
 
+                {/* Upcoming Consultations Section */}
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Calendar size={20} className="text-gray-500" />
+                        Prochaines Consultations
+                        {confirmedAppointments.length > 0 && <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">{confirmedAppointments.length}</Badge>}
+                    </h2>
+                    {loading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full" />)}
+                        </div>
+                    ) : confirmedAppointments.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {confirmedAppointments.map(apt => (
+                                <Card key={apt.id} className="border-l-4 border-l-blue-500">
+                                    <CardContent className="p-5">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h3 className="font-semibold text-gray-900">{apt.patientName}</h3>
+                                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Confirmé</Badge>
+                                        </div>
+                                        <div className="space-y-1 mb-4">
+                                            <p className="text-sm text-gray-600 flex items-center gap-2">
+                                                <Calendar size={14} /> {apt.date} à {apt.time}
+                                            </p>
+                                            <p className="text-sm text-gray-500 italic">"{apt.reason}"</p>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            onClick={() => handleAppointmentStatus(apt.id, 'completed')}
+                                        >
+                                            Marquer comme terminé
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white p-8 rounded-xl border border-dashed border-gray-300 text-center text-gray-500">
+                            <p>Aucune consultation à venir.</p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Patient List Section */}
                 <div>
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -141,6 +229,11 @@ const Dashboard = () => {
                             <User size={28} className="text-gray-700" /> Aperçu des Patients
                         </h1>
                         <div className="flex gap-3 w-full md:w-auto">
+                            <Link to="/terminal" className="w-full md:w-auto">
+                                <Button variant="secondary" className="w-full gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200">
+                                    <CreditCard size={18} /> Terminal Paiement
+                                </Button>
+                            </Link>
                             <Link to="/messaging" className="w-full md:w-auto">
                                 <Button variant="secondary" className="w-full gap-2">
                                     <MessageSquare size={18} /> Messagerie

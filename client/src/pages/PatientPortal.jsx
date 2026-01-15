@@ -3,7 +3,7 @@ import AiAssistant from '../components/AiAssistant';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote } from 'lucide-react';
+import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -21,9 +21,15 @@ const PatientPortal = () => {
     const [prescriptions, setPrescriptions] = useState([]);
     const [forecast, setForecast] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
+    const [isAddVitalOpen, setIsAddVitalOpen] = useState(false);
 
     useEffect(() => {
-        if (!patientId || !currentUser) return;
+        if (!currentUser) return;
+
+        if (!patientId) {
+            setLoading(false); // Stop loading if no patient ID associated
+            return;
+        }
 
         const fetchData = async () => {
             try {
@@ -60,7 +66,15 @@ const PatientPortal = () => {
         </div>
     );
 
-    if (!patient) return <div className="p-8 text-center text-red-500">Erreur de chargement.</div>;
+    if (!patient) return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+            <div className="bg-red-50 text-red-600 p-6 rounded-lg max-w-md">
+                <h3 className="font-bold text-lg mb-2">Profil Introuvable</h3>
+                <p>Impossible de charger les données du patient. Veuillez contacter votre médecin.</p>
+                <Button variant="outline" className="mt-4" onClick={logout}>Déconnexion</Button>
+            </div>
+        </div>
+    );
 
     // Filter vitals for chart (reuse logic from PatientDetails)
     const filteredVitals = vitals?.readings
@@ -142,18 +156,46 @@ const PatientPortal = () => {
             <main className="container py-8 space-y-8">
                 <Card className="bg-gradient-to-r from-primary/5 to-white border-primary/10">
                     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
+                        <div className="flex-1">
                             <h1 className="text-2xl font-bold text-gray-900">Bonjour, {patient.name}</h1>
-                            <p className="text-gray-500 mt-1 flex items-center gap-2">
-                                <Clock size={14} /> Dernière visite: {patient.lastVisit}
-                            </p>
+                            <div className="flex items-center gap-4 mt-2">
+                                <p className="text-gray-500 text-sm flex items-center gap-2">
+                                    <Clock size={14} /> Dernière visite: {patient.lastVisit}
+                                </p>
+
+                                {/* Doctor Info - Miniature */}
+                                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
+                                    <div className="w-6 h-6 rounded-full overflow-hidden border border-gray-200">
+                                        {patient.doctorPhoto ? (
+                                            <img src={patient.doctorPhoto} alt="Doctor" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">DR</div>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-600 font-medium">
+                                        {patient.doctorName || "Dr. Specialiste"}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <Button
-                            onClick={() => setActiveTab('appointments')}
-                            className="shadow-md"
-                        >
-                            <Calendar size={18} className="mr-2" /> Prendre Rendez-vous
-                        </Button>
+
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="hidden sm:flex"
+                                onClick={() => setAddVitalOpen(true)}
+                            >
+                                <Plus size={16} className="mr-2" /> Ajouter Mesure
+                            </Button>
+                            <Button
+                                onClick={() => setActiveTab('appointments')}
+                                className="shadow-md"
+                                size="sm"
+                            >
+                                <Calendar size={16} className="mr-2" /> Rendez-vous
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -201,16 +243,26 @@ const PatientPortal = () => {
                                     <Icon className="w-5 h-5" style={{ color: config.color }} />
                                     Votre Tendance ({selectedVitalType})
                                 </CardTitle>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleForecast}
-                                    disabled={analyzing}
-                                    className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                >
-                                    <Sparkles size={14} className={`mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                                    {analyzing ? "Analyse..." : "Analyser avec IA"}
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsAddVitalOpen(true)}
+                                        className="text-primary border-primary/20 hover:bg-primary/5 gap-1"
+                                    >
+                                        <Plus size={16} /> <span className="hidden sm:inline">Ajouter</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleForecast}
+                                        disabled={analyzing}
+                                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                    >
+                                        <Sparkles size={14} className={`mr-2 ${analyzing ? "animate-spin" : ""}`} />
+                                        {analyzing ? "Analyse..." : "IA"}
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 {forecast && (
@@ -275,7 +327,7 @@ const PatientPortal = () => {
                 {activeTab === 'appointments' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <AppointmentList patientId={patientId} currentUser={currentUser} />
-                        <AppointmentRequestForm patientId={patientId} patientName={patient.name} currentUser={currentUser} />
+                        <AppointmentRequestForm patientId={patientId} patientName={patient.name} doctorId={patient.doctorId} currentUser={currentUser} />
                     </div>
                 )}
 
@@ -319,11 +371,13 @@ const PatientPortal = () => {
                 {activeTab === 'payments' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div className="space-y-6">
-                            <PaymentForm onSuccess={() => {
-                                // Trigger refresh of payment history logic if we had it lifted up
-                                // For now, we rely on the component mount or we can force reload
-                                window.location.reload();
-                            }} />
+                            <PaymentForm
+                                doctorId={patient.doctorId}
+                                onSuccess={() => {
+                                    // Trigger refresh of payment history logic if we had it lifted up
+                                    // For now, we rely on the component mount or we can force reload
+                                    window.location.reload();
+                                }} />
                         </div>
                         <div className="space-y-6">
                             <PaymentHistoryList patientId={patientId} currentUser={currentUser} />
@@ -340,9 +394,9 @@ const PatientPortal = () => {
                             </CardHeader>
                             <div className="flex-1 overflow-hidden p-0">
                                 <ChatInterface
-                                    currentUser={currentUser}
-                                    contactId="SPECIALIST" // For patient, they chat with 'SPECIALIST' logic
-                                    contactName="Dr. Specialist"
+                                    currentUser={{ ...currentUser, publicId: patientId }}
+                                    contactId={patient.doctorId || "SPECIALIST"} // Use actual doctor ID if available
+                                    contactName={patient.doctorName || "Dr. Specialist"}
                                 />
                             </div>
                         </Card>
@@ -352,11 +406,24 @@ const PatientPortal = () => {
 
             {/* AI Assistant */}
             <AiAssistant />
+
+            {isAddVitalOpen && (
+                <AddVitalForm
+                    patientId={patientId}
+                    currentUser={currentUser}
+                    initialType={selectedVitalType}
+                    onSuccess={() => {
+                        setIsAddVitalOpen(false);
+                        window.location.reload(); // Simple reload to fetch new data
+                    }}
+                    onCancel={() => setIsAddVitalOpen(false)}
+                />
+            )}
         </div>
     );
 };
 
-const AppointmentRequestForm = ({ patientId, patientName, currentUser }) => {
+const AppointmentRequestForm = ({ patientId, patientName, doctorId, currentUser }) => {
     const [formData, setFormData] = useState({ date: '', time: '', reason: '' });
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -374,7 +441,7 @@ const AppointmentRequestForm = ({ patientId, patientName, currentUser }) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ ...formData, patientId, patientName })
+                body: JSON.stringify({ ...formData, patientId, patientName, doctorId })
             });
 
             if (response.ok) {
@@ -579,6 +646,165 @@ const PaymentHistoryList = ({ patientId, currentUser }) => {
                 )}
             </CardContent>
         </Card>
+    );
+};
+
+// ... (existing code)
+
+const AddVitalForm = ({ patientId, currentUser, onSuccess, onCancel, initialType = 'Glucose' }) => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [type, setType] = useState(initialType);
+    const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().slice(0, 5),
+        value: '',
+        systolic: '',
+        diastolic: '',
+        subtype: 'Fasting'
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        try {
+            const token = await currentUser.getIdToken();
+
+            // Construct payload based on type
+            let payload = {
+                category: type,
+                date: formData.date // Backend likely expects YYYY-MM-DD
+            };
+
+            if (type === 'Blood Pressure') {
+                payload.systolic = parseInt(formData.systolic);
+                payload.diastolic = parseInt(formData.diastolic);
+                payload.value = `${formData.systolic}/${formData.diastolic}`;
+            } else {
+                payload.value = parseFloat(formData.value);
+            }
+
+            if (type === 'Glucose') {
+                payload.subtype = formData.subtype;
+            }
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/vitals`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Failed to add vital");
+
+            onSuccess();
+        } catch (err) {
+            console.error(err);
+            setError("Erreur lors de l'enregistrement.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md bg-white">
+                <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                    <CardTitle>Nouvelle Mesure</CardTitle>
+                    <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+                        <XCircle size={24} />
+                    </button>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    {error && <div className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded">{error}</div>}
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Type de mesure</label>
+                            <select
+                                value={type}
+                                onChange={(e) => setType(e.target.value)}
+                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border"
+                            >
+                                <option value="Glucose">Glucose</option>
+                                <option value="Blood Pressure">Tension Artérielle</option>
+                                <option value="Weight">Poids</option>
+                                <option value="Heart Rate">Rythme Cardiaque</option>
+                            </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Heure</label>
+                                <Input type="time" required value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} />
+                            </div>
+                        </div>
+
+                        {type === 'Glucose' && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contexte</label>
+                                    <select
+                                        value={formData.subtype}
+                                        onChange={e => setFormData({ ...formData, subtype: e.target.value })}
+                                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border"
+                                    >
+                                        <option value="Fasting">À Jeun</option>
+                                        <option value="Post-Prandial">Après repas (2h)</option>
+                                        <option value="Random">Aléatoire</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Valeur (mg/dL)</label>
+                                    <Input type="number" required min="20" max="600" value={formData.value} onChange={e => setFormData({ ...formData, value: e.target.value })} placeholder="Ex: 110" />
+                                </div>
+                            </>
+                        )}
+
+                        {type === 'Blood Pressure' && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Systolique</label>
+                                    <Input type="number" required min="50" max="250" value={formData.systolic} onChange={e => setFormData({ ...formData, systolic: e.target.value })} placeholder="120" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Diastolique</label>
+                                    <Input type="number" required min="30" max="150" value={formData.diastolic} onChange={e => setFormData({ ...formData, diastolic: e.target.value })} placeholder="80" />
+                                </div>
+                            </div>
+                        )}
+
+                        {type === 'Weight' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Poids (kg)</label>
+                                <Input type="number" step="0.1" required min="0" value={formData.value} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                            </div>
+                        )}
+
+                        {type === 'Heart Rate' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Rythme (bpm)</label>
+                                <Input type="number" required min="30" max="250" value={formData.value} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 pt-4">
+                            <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+                            <Button type="submit" className="flex-1" disabled={loading}>
+                                {loading ? 'Enregistrement...' : 'Enregistrer'}
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
+        </div>
     );
 };
 

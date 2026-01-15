@@ -4,13 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { Mail } from 'lucide-react';
 
 const DoctorMessaging = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, doctorProfile } = useAuth();
     const [patients, setPatients] = useState([]);
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch(`${import.meta.env.VITE_API_URL}/api/patients`)
+        if (!doctorProfile?.id) return;
+
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`)
             .then(res => res.json())
             .then(data => {
                 setPatients(data);
@@ -45,8 +47,8 @@ const DoctorMessaging = () => {
                                         key={patient.id}
                                         onClick={() => setSelectedPatient(patient)}
                                         className={`w-full text-left p-3 rounded-lg transition-colors flex items-center justify-between ${selectedPatient?.id === patient.id
-                                                ? 'bg-blue-100 text-blue-900'
-                                                : 'hover:bg-gray-100 text-gray-700'
+                                            ? 'bg-blue-100 text-blue-900'
+                                            : 'hover:bg-gray-100 text-gray-700'
                                             }`}
                                     >
                                         <span className="font-medium">{patient.name}</span>
@@ -64,6 +66,8 @@ const DoctorMessaging = () => {
                         <div className="w-full max-w-2xl">
                             <ChatInterface
                                 currentUser={currentUser}
+                                customSenderId={doctorProfile?.id}
+                                customSenderName={doctorProfile?.name}
                                 contactId={selectedPatient.id} // Passing patient ID as contact
                                 contactName={selectedPatient.name}
                                 isSpecialist={true}

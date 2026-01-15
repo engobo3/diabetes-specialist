@@ -1,28 +1,5 @@
 [
     {
-        "id": 1,
-        "name": "Dr. Sarah Connor",
-        "specialty": "Endocrinologist",
-        "bio": "Dr. Sarah Connor is a leading expert in Type 1 Diabetes management with over 15 years of experience. She is dedicated to helping patients achieve their best health through personalized care and advanced technology.",
-        "education": [
-            "MD, Harvard Medical School",
-            "Residency, Johns Hopkins Hospital",
-            "Fellowship in Endocrinology, Mayo Clinic"
-        ],
-        "contact": {
-            "email": "sarah.connor@glucocare.com",
-            "phone": "+1 (555) 123-4567",
-            "address": "123 Medical Center Dr, Suite 100, Metropolis"
-        },
-        "languages": [
-            "English",
-            "French",
-            "Spanish"
-        ],
-        "image": "https://randomuser.me/api/portraits/women/68.jpg",
-        "role": "admin"
-    },
-    {
         "id": 2,
         "name": "Dr. John Kim",
         "specialty": "Pediatric Diabetologist",
@@ -41,7 +18,8 @@
             "Korean"
         ],
         "image": "https://randomuser.me/api/portraits/men/32.jpg",
-        "role": "doctor"
+        "role": "doctor",
+        "city": "Kinshasa"
     },
     {
         "id": 3,
@@ -61,7 +39,8 @@
             "English",
             "Mandarin"
         ],
-        "image": "https://randomuser.me/api/portraits/women/44.jpg"
+        "image": "https://randomuser.me/api/portraits/women/44.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 4,
@@ -79,7 +58,8 @@
         "languages": [
             "English"
         ],
-        "image": "https://randomuser.me/api/portraits/men/86.jpg"
+        "image": "https://randomuser.me/api/portraits/men/86.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 5,
@@ -98,7 +78,8 @@
             "English",
             "Cantonese"
         ],
-        "image": "https://randomuser.me/api/portraits/women/22.jpg"
+        "image": "https://randomuser.me/api/portraits/women/22.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 6,
@@ -117,7 +98,8 @@
             "English",
             "German"
         ],
-        "image": "https://randomuser.me/api/portraits/men/11.jpg"
+        "image": "https://randomuser.me/api/portraits/men/11.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 7,
@@ -137,7 +119,8 @@
             "Hindi",
             "Gujarati"
         ],
-        "image": "https://randomuser.me/api/portraits/women/55.jpg"
+        "image": "https://randomuser.me/api/portraits/women/55.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 8,
@@ -156,7 +139,8 @@
             "English",
             "Spanish"
         ],
-        "image": "https://randomuser.me/api/portraits/men/76.jpg"
+        "image": "https://randomuser.me/api/portraits/men/76.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 9,
@@ -175,7 +159,8 @@
             "English",
             "Spanish"
         ],
-        "image": "https://randomuser.me/api/portraits/women/90.jpg"
+        "image": "https://randomuser.me/api/portraits/women/90.jpg",
+        "city": "Kinshasa"
     },
     {
         "id": 10,
@@ -194,6 +179,28 @@
             "English",
             "Igbo"
         ],
-        "image": "https://randomuser.me/api/portraits/men/45.jpg"
+        "image": "https://randomuser.me/api/portraits/men/45.jpg",
+        "city": "Kinshasa"
+    },
+    {
+        "id": 99,
+        "name": "Dr. Joseph Kensese",
+        "specialty": "Chief of Medicine",
+        "bio": "Specialist in Diabetes Management and Endocrinology.",
+        "education": [
+            "MD, University of Kinshasa"
+        ],
+        "contact": {
+            "email": "kensesebertol@yahoo.fr",
+            "phone": "+1 (555) 000-0000",
+            "address": "123 Clinic St"
+        },
+        "languages": [
+            "English",
+            "French"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/1.jpg",
+        "role": "admin",
+        "city": "Kinshasa"
     }
 ]

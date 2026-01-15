@@ -2,10 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
+import { useAuth } from '../context/AuthContext';
+
 const AddPatient = () => {
     const navigate = useNavigate();
+    const { currentUser, doctorProfile } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
+        email: '',
+        phone: '',
         age: '',
         type: 'Type 1',
         status: 'Stable'
@@ -18,23 +23,34 @@ const AddPatient = () => {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        fetch(`${import.meta.env.VITE_API_URL}/api/patients`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        })
-            .then(res => res.json())
-            .then(data => {
-                navigate('/dashboard');
-            })
-            .catch(err => {
-                console.error("Error creating patient", err);
+        try {
+            const token = await currentUser.getIdToken();
+            const payload = {
+                ...formData,
+                doctorId: doctorProfile?.id,
+                doctorName: doctorProfile?.name
+            };
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
             });
+
+            if (response.ok) {
+                navigate('/dashboard');
+            } else {
+                console.error("Failed to create patient");
+            }
+        } catch (error) {
+            console.error("Error creating patient", error);
+        }
     };
 
     return (
@@ -66,6 +82,37 @@ const AddPatient = () => {
                                 value={formData.name}
                                 onChange={handleChange}
                                 required
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+                                Email (Optionnel)
+                            </label>
+                            <input
+                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                id="email"
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                placeholder="patient@exemple.com"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Option: Laissez vide si le patient n'a pas d'email.</p>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="phone">
+                                Téléphone (Recommandé pour activation)
+                            </label>
+                            <input
+                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                id="phone"
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="ex: 0812345678"
                             />
                         </div>
 

@@ -6,7 +6,8 @@
     "age": 45,
     "type": "Type 2",
     "lastVisit": "2025-12-15",
-    "status": "Stable"
+    "status": "Stable",
+    "doctorId": 1
   },
   {
     "id": 2,
@@ -14,7 +15,8 @@
     "age": 32,
     "type": "Type 1",
     "lastVisit": "2025-12-28",
-    "status": "Attention Needed"
+    "status": "Attention Needed",
+    "doctorId": 1
   },
   {
     "id": 3,
@@ -22,23 +24,8 @@
     "age": 58,
     "type": "Type 2",
     "lastVisit": "2026-01-02",
-    "status": "Critical"
-  },
-  {
-    "id": 5,
-    "name": "",
-    "age": null,
-    "type": "Type 1",
-    "status": "Stable",
-    "lastVisit": "2026-01-06"
-  },
-  {
-    "id": 6,
-    "name": "",
-    "age": null,
-    "type": "Type 1",
-    "status": "Stable",
-    "lastVisit": "2026-01-06"
+    "status": "Critical",
+    "doctorId": 2
   },
   {
     "id": 7,
@@ -46,27 +33,40 @@
     "age": 30,
     "type": "Type 1",
     "status": "Stable",
-    "lastVisit": "2026-01-06"
+    "lastVisit": "2026-01-06",
+    "doctorId": 1
   },
   {
-    "name": "Test Migration",
-    "age": "30",
-    "type": "Type 1",
+    "id": 101,
+    "name": "Demo Patient Alpha",
+    "age": 55,
+    "type": "Type 2",
+    "lastVisit": "2026-01-10",
     "status": "Stable",
-    "id": 8
+    "doctorId": 99,
+    "email": "alpha@demo.com",
+    "phone": "0990000001"
   },
   {
-    "name": "",
-    "age": "",
+    "id": 102,
+    "name": "Demo Patient Beta",
+    "age": 28,
     "type": "Type 1",
-    "status": "Stable",
-    "id": 9
+    "lastVisit": "2026-01-08",
+    "status": "Attention Needed",
+    "doctorId": 99,
+    "email": "beta@demo.com",
+    "phone": "0990000002"
   },
   {
-    "name": "Fallback User Edited",
-    "age": "45",
-    "type": "Type 1",
-    "status": "Stable",
-    "id": 10
+    "id": 103,
+    "name": "Demo Patient Gamma",
+    "age": 62,
+    "type": "Type 2",
+    "lastVisit": "2025-12-20",
+    "status": "Critical",
+    "doctorId": 99,
+    "email": "gamma@demo.com",
+    "phone": "0990000003"
   }
 ]

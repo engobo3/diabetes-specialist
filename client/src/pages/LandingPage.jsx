@@ -55,9 +55,14 @@ const LandingPage = () => {
                         Faire avancer la médecine et transformer des vies grâce à la recherche, l'éducation et la compassion.
                     </p>
                     <div className="flex gap-4">
-                        <Link to="/portal">
-                            <Button className="bg-accent hover:bg-orange-600 text-white border-none text-lg px-8 py-6">
-                                Prendre Rendez-vous
+                        <Link to="/specialties">
+                            <Button size="lg" className="w-full sm:w-auto px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all">
+                                Trouver un Spécialiste
+                            </Button>
+                        </Link>
+                        <Link to="/login">
+                            <Button className="bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm text-lg px-8 py-6">
+                                Accès Démo
                             </Button>
                         </Link>
                     </div>

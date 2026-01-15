@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles } from 'lucide-react';
+import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles, Edit2, Save, Calendar, Phone, FileText, Upload, Trash2 } from 'lucide-react';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const PatientDetails = () => {
     const { id } = useParams();
@@ -14,17 +16,36 @@ const PatientDetails = () => {
     const [analyzing, setAnalyzing] = useState(false);
 
     const [prescriptions, setPrescriptions] = useState([]);
+    const [appointments, setAppointments] = useState([]);
+
+    // Phone Editing State
+    const [isEditingPhone, setIsEditingPhone] = useState(false);
+    const [phone, setPhone] = useState('');
+
+    // Note Editing State
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [noteText, setNoteText] = useState('');
+
+    const [documents, setDocuments] = useState([]);
+    const [uploading, setUploading] = useState(false);
 
     const fetchData = () => {
         Promise.all([
             fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`).then(res => res.json()),
             fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`).then(res => res.json())
+            fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`).then(res => res.json()),
+            fetch(`${import.meta.env.VITE_API_URL}/api/appointments`).then(res => res.json()),
+            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`).then(res => res.json())
         ])
-            .then(([patientData, vitalsData, prescriptionsData]) => {
+            .then(([patientData, vitalsData, prescriptionsData, appointmentsData, documentsData]) => {
                 setPatient(patientData);
+                setPhone(patientData.phone || '');
                 setVitals(vitalsData);
                 setPrescriptions(prescriptionsData);
+                const patientApps = appointmentsData.filter(a => String(a.patientId) === String(id));
+                setAppointments(patientApps);
+                // Ensure documentsData is an array if API returns error or empty
+                setDocuments(Array.isArray(documentsData) ? documentsData : []);
                 setLoading(false);
             })
             .catch(err => {
@@ -123,6 +144,48 @@ const PatientDetails = () => {
         }
     };
 
+    const handleUpdatePhone = async () => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+
+            if (response.ok) {
+                setPatient(prev => ({ ...prev, phone }));
+                setIsEditingPhone(false);
+            } else {
+                alert('Erreur lors de la mise à jour du téléphone');
+            }
+        } catch (error) {
+            console.error('Error updating phone:', error);
+            alert('Erreur lors de la mise à jour');
+        }
+    };
+
+    const handleSaveNote = async (appointmentId) => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/appointments/${appointmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: noteText }),
+            });
+
+            if (response.ok) {
+                setAppointments(prev => prev.map(app =>
+                    app.id === appointmentId ? { ...app, notes: noteText } : app
+                ));
+                setEditingNoteId(null);
+            } else {
+                alert('Erreur lors de l\'enregistrement de la note');
+            }
+        } catch (error) {
+            console.error('Error saving note:', error);
+            alert('Erreur lors de l\'enregistrement');
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-gray-500">Chargement des détails du patient...</div>;
     if (!patient) return <div className="p-8 text-center text-red-500">Patient non trouvé</div>;
 
@@ -196,8 +259,36 @@ const PatientDetails = () => {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900 mb-2">{patient.name}</h1>
-                            <p className="text-gray-500">Âge: {patient.age} • Type de Diabète: {patient.type}</p>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">{patient.name}</h1>
+                            <div className="flex items-center gap-4 text-gray-500">
+                                <span>Âge: {patient.age}</span>
+                                <span>•</span>
+                                <span>Type: {patient.type}</span>
+                                <span>•</span>
+                                <div className="flex items-center gap-2">
+                                    <Phone size={16} />
+                                    {isEditingPhone ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={phone}
+                                                onChange={(e) => setPhone(e.target.value)}
+                                                className="border rounded px-2 py-1 text-sm w-32"
+                                            />
+                                            <button onClick={handleUpdatePhone} className="text-green-600 hover:text-green-700">
+                                                <Save size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 group">
+                                            <span>{patient.phone || 'Aucun numéro'}</span>
+                                            <button onClick={() => setIsEditingPhone(true)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity">
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         <div className="text-right">
                             <span className={`text-lg font-bold ${patient.status === 'Critical' ? 'text-red-600' : 'text-green-600'}`}>
@@ -233,6 +324,24 @@ const PatientDetails = () => {
                     >
                         Ordonnances
                     </button>
+                    <button
+                        onClick={() => setSelectedVitalType('Appointments')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Appointments'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Rendez-vous
+                    </button>
+                    <button
+                        onClick={() => setSelectedVitalType('Documents')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Documents'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Documents
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -255,6 +364,117 @@ const PatientDetails = () => {
                                     </div>
                                 ) : (
                                     <p className="text-gray-500 text-center py-8">Aucune ordonnance.</p>
+                                )}
+                            </div>
+                        ) : selectedVitalType === 'Appointments' ? (
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                    <Calendar className="text-blue-600" />
+                                    Historique des Rendez-vous
+                                </h3>
+                                {appointments.length > 0 ? (
+                                    <div className="space-y-6">
+                                        {[...appointments].sort((a, b) => new Date(b.date) - new Date(a.date)).map(app => (
+                                            <div key={app.id} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                                                            {new Date(app.date).toLocaleDateString('fr-FR')} à {app.time}
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${app.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                                                                app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                                    'bg-gray-100 text-gray-600'
+                                                                }`}>
+                                                                {app.status}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 mt-1">{app.reason}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                                        Notes du Médecin
+                                                    </label>
+                                                    {editingNoteId === app.id ? (
+                                                        <div className="space-y-2">
+                                                            <textarea
+                                                                className="w-full p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                rows="3"
+                                                                value={noteText}
+                                                                onChange={(e) => setNoteText(e.target.value)}
+                                                                placeholder="Ajouter un compte-rendu ou des observations..."
+                                                            ></textarea>
+                                                            <div className="flex justify-end gap-2">
+                                                                <button
+                                                                    onClick={() => setEditingNoteId(null)}
+                                                                    className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1"
+                                                                >
+                                                                    Annuler
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleSaveNote(app.id)}
+                                                                    className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 flex items-center gap-1"
+                                                                >
+                                                                    <Save size={14} /> Enregistrer
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="group relative">
+                                                            <div className={`p-3 rounded-md text-sm ${app.notes ? 'bg-white border border-gray-200 text-gray-700' : 'bg-gray-100 text-gray-400 italic'}`}>
+                                                                {app.notes || "Aucune note enregistrée."}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingNoteId(app.id);
+                                                                    setNoteText(app.notes || '');
+                                                                }}
+                                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 p-1.5 rounded-full text-gray-500 hover:text-blue-600 transition-all"
+                                                                title="Modifier la note"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">Aucun rendez-vous enregistré.</p>
+                                )}
+                            </div>
+
+                        ) : selectedVitalType === 'Documents' ? (
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                    <FileText className="text-blue-600" />
+                                    Dossier Médical (Fichiers)
+                                </h3>
+                                {documents.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[...documents].sort((a, b) => new Date(b.date) - new Date(a.date)).map((doc, idx) => (
+                                            <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" className="block group">
+                                                <div className="border border-gray-200 p-4 rounded-lg bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition-all">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="bg-white p-2 rounded shadow-sm text-red-500">
+                                                            <FileText size={24} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-bold text-gray-900 truncate group-hover:text-blue-700">{doc.name}</h4>
+                                                            <p className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                                                                <span className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-700 font-medium">{doc.type}</span>
+                                                                <span>{doc.date}</span>
+                                                                <span>• {doc.size}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">Aucun document archivé.</p>
                                 )}
                             </div>
                         ) : (
@@ -380,6 +600,7 @@ const PatientDetails = () => {
 
                             {selectedVitalType === 'Prescriptions' ? (
                                 <form onSubmit={handleAddPrescription} className="space-y-4">
+                                    {/* Prescription Form Fields (Same as before) */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Médicament</label>
                                         <input type="text" name="medication" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Ex: Metformine" />
@@ -400,8 +621,36 @@ const PatientDetails = () => {
                                         Créer Ordonnance
                                     </button>
                                 </form>
+                            ) : selectedVitalType === 'Documents' ? (
+                                <form onSubmit={handleUploadDocument} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Type de Document</label>
+                                        <select name="type" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                            <option value="Lab Result">Résultat Labo</option>
+                                            <option value="X-Ray">Radio / Imagerie</option>
+                                            <option value="Prescription Scan">Scann Ordonnance</option>
+                                            <option value="ID Card">Carte d'Identité</option>
+                                            <option value="Other">Autre</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Fichier</label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
+                                            <input type="file" name="file" required className="hidden" id="file-upload" />
+                                            <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                                                <Upload className="text-gray-400" size={24} />
+                                                <span className="text-sm text-blue-600 font-medium">Cliquez pour choisir un fichier</span>
+                                                <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 5MB)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button disabled={uploading} type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50">
+                                        {uploading ? 'Téléchargement...' : 'Uploader le Document'}
+                                    </button>
+                                </form>
                             ) : (
                                 <form onSubmit={handleAddVital} className="space-y-4">
+                                    {/* Vitals Form Fields (Same as before) */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date</label>
                                         <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />

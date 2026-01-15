@@ -35,3 +35,4 @@ if (require.main === module) {
 
 // Export the Express app as a Cloud Function
 exports.api = onRequest(app);
+exports.app = app;

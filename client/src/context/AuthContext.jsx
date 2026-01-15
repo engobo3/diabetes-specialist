@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userRole, setUserRole] = useState(null); // 'admin', 'doctor', 'patient', or null
     const [patientId, setPatientId] = useState(null);
+    const [doctorProfile, setDoctorProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const login = (email, password) => {
@@ -33,7 +34,16 @@ export const AuthProvider = ({ children }) => {
 
                     // Check if user is a patient
                     const apiUrl = import.meta.env.VITE_API_URL || '';
-                    const response = await fetch(`${apiUrl}/api/patients/lookup?email=${user.email}`, {
+
+                    let lookupUrl = `${apiUrl}/api/patients/lookup?email=${user.email}`;
+
+                    // Handle synthetic email for phone login
+                    if (user.email && user.email.endsWith('@glucosoin.crm')) {
+                        const phone = user.email.split('@')[0];
+                        lookupUrl = `${apiUrl}/api/patients/lookup?phone=${phone}`;
+                    }
+
+                    const response = await fetch(lookupUrl, {
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }
@@ -43,6 +53,23 @@ export const AuthProvider = ({ children }) => {
                         const patientData = await response.json();
                         setUserRole('patient');
                         setPatientId(patientData.id);
+
+                        // Sync UID to database if missing (Self-healing ID link)
+                        if (!patientData.uid) {
+                            try {
+                                fetch(`${apiUrl}/api/patients/${patientData.id}`, {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({ uid: user.uid })
+                                });
+                                console.log("Linked Firebase UID to Patient Record");
+                            } catch (e) {
+                                console.error("Failed to sync UID", e);
+                            }
+                        }
                     } else {
                         // Not a patient, check if doctor/admin
                         try {
@@ -52,7 +79,8 @@ export const AuthProvider = ({ children }) => {
 
                             if (doctorRes.ok) {
                                 const doctorData = await doctorRes.json();
-                                setUserRole(doctorData.role || 'doctor'); // Default to doctor if no role set
+                                setUserRole(doctorData.role || 'doctor');
+                                setDoctorProfile(doctorData); // Store full profile
                             } else {
                                 // Not in doctors DB? Default to 'doctor' for now (or 'specialist')
                                 // Ideally, we might want to block access or set 'pending'.
@@ -87,6 +115,7 @@ export const AuthProvider = ({ children }) => {
         currentUser,
         userRole,
         patientId,
+        doctorProfile,
         login,
         logout
     };
