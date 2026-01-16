@@ -809,6 +809,64 @@ const addLocalPatientDocument = (patientId, docData) => {
     return newDoc;
 };
 
+// --- Medical Records Operations ---
+
+const getMedicalRecords = async (patientId) => {
+    try {
+        if (db) {
+            try {
+                const snapshot = await db.collection('patients').doc(String(patientId)).collection('medicalRecords').orderBy('date', 'desc').get();
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (fsError) {
+                console.error('Firestore Error (Fallback to Local):', fsError.message);
+                const patients = readLocalData();
+                const p = patients.find(p => String(p.id) === String(patientId));
+                return p?.medicalRecords || [];
+            }
+        } else {
+            const patients = readLocalData();
+            const p = patients.find(p => String(p.id) === String(patientId));
+            return p?.medicalRecords || [];
+        }
+    } catch (error) {
+        console.error('Error fetching medical records:', error);
+        return [];
+    }
+};
+
+const addMedicalRecord = async (patientId, recordData) => {
+    try {
+        if (db) {
+            try {
+                const docRef = await db.collection('patients').doc(String(patientId)).collection('medicalRecords').add(recordData);
+                return { id: docRef.id, ...recordData };
+            } catch (fsError) {
+                console.error('Firestore Error (Fallback to Local):', fsError.message);
+                return addLocalMedicalRecord(patientId, recordData);
+            }
+        } else {
+            return addLocalMedicalRecord(patientId, recordData);
+        }
+    } catch (error) {
+        console.error('Error adding medical record:', error);
+        throw error;
+    }
+};
+
+const addLocalMedicalRecord = (patientId, recordData) => {
+    let patients = readLocalData();
+    const index = patients.findIndex(p => String(p.id) === String(patientId));
+    if (index === -1) throw new Error("Patient not found");
+
+    const newRecord = { id: Date.now().toString(), ...recordData };
+
+    if (!patients[index].medicalRecords) patients[index].medicalRecords = [];
+    patients[index].medicalRecords.push(newRecord);
+
+    writeLocalData(patients);
+    return newRecord;
+};
+
 module.exports = {
     getPatients,
     getPatientById,
