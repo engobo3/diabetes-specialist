@@ -27,6 +27,7 @@ const PatientDetails = () => {
     const [noteText, setNoteText] = useState('');
 
     const [documents, setDocuments] = useState([]);
+    const [medicalRecords, setMedicalRecords] = useState([]);
     const [uploading, setUploading] = useState(false);
 
     const fetchData = () => {
@@ -35,9 +36,10 @@ const PatientDetails = () => {
             fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`).then(res => res.json()),
             fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`).then(res => res.json()),
             fetch(`${import.meta.env.VITE_API_URL}/api/appointments`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`).then(res => res.json())
+            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`).then(res => res.json()),
+            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/records`).then(res => res.json())
         ])
-            .then(([patientData, vitalsData, prescriptionsData, appointmentsData, documentsData]) => {
+            .then(([patientData, vitalsData, prescriptionsData, appointmentsData, documentsData, recordsData]) => {
                 setPatient(patientData);
                 setPhone(patientData.phone || '');
                 setVitals(vitalsData);
@@ -46,6 +48,7 @@ const PatientDetails = () => {
                 setAppointments(patientApps);
                 // Ensure documentsData is an array if API returns error or empty
                 setDocuments(Array.isArray(documentsData) ? documentsData : []);
+                setMedicalRecords(Array.isArray(recordsData) ? recordsData : []);
                 setLoading(false);
             })
             .catch(err => {
@@ -183,6 +186,36 @@ const PatientDetails = () => {
         } catch (error) {
             console.error('Error saving note:', error);
             alert('Erreur lors de l\'enregistrement');
+        }
+    };
+
+    const handleAddMedicalRecord = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        const newRecord = {
+            date: formData.get('date') || new Date().toISOString().split('T')[0],
+            type: formData.get('type'),
+            description: formData.get('description'),
+            doctor: 'Dr. (Auto)' // In a real app, this would be the logged in doctor
+        };
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/records`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newRecord),
+            });
+
+            if (response.ok) {
+                fetchData();
+                e.target.reset();
+            } else {
+                alert('Erreur lors de l\'ajout au dossier médical');
+            }
+        } catch (error) {
+            console.error('Error adding medical record:', error);
+            alert('Erreur lors de l\'ajout au dossier médical');
         }
     };
 
@@ -342,6 +375,15 @@ const PatientDetails = () => {
                     >
                         Documents
                     </button>
+                    <button
+                        onClick={() => setSelectedVitalType('MedicalRecords')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'MedicalRecords'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Dossier Médical
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -449,7 +491,7 @@ const PatientDetails = () => {
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
                                     <FileText className="text-blue-600" />
-                                    Dossier Médical (Fichiers)
+                                    Documents
                                 </h3>
                                 {documents.length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -475,6 +517,33 @@ const PatientDetails = () => {
                                     </div>
                                 ) : (
                                     <p className="text-gray-500 text-center py-8">Aucun document archivé.</p>
+                                )}
+                            </div>
+                        ) : selectedVitalType === 'MedicalRecords' ? (
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                    <Activity className="text-blue-600" />
+                                    Dossier Médical
+                                </h3>
+                                {medicalRecords.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {medicalRecords.map((record, idx) => (
+                                            <div key={idx} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-bold text-gray-900">{record.type}</span>
+                                                            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{record.date}</span>
+                                                        </div>
+                                                        <p className="text-gray-700 text-sm whitespace-pre-wrap">{record.description}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 text-xs text-blue-600 font-medium">Ajouté par {record.doctor || 'Médecin'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">Dossier médical vide.</p>
                                 )}
                             </div>
                         ) : (
@@ -646,6 +715,31 @@ const PatientDetails = () => {
                                     </div>
                                     <button disabled={uploading} type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50">
                                         {uploading ? 'Téléchargement...' : 'Uploader le Document'}
+                                    </button>
+                                </form>
+                            ) : selectedVitalType === 'MedicalRecords' ? (
+                                <form onSubmit={handleAddMedicalRecord} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Type d'entrée</label>
+                                        <select name="type" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                            <option value="Diagnosis">Diagnostic</option>
+                                            <option value="Surgery">Chirurgie</option>
+                                            <option value="Allergy">Allergie</option>
+                                            <option value="Immunization">Vaccination</option>
+                                            <option value="Family History">Antécédents Familiaux</option>
+                                            <option value="Other">Autre / Note</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                        <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description / Notes</label>
+                                        <textarea name="description" required rows="4" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Détails..."></textarea>
+                                    </div>
+                                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                        Ajouter au Dossier
                                     </button>
                                 </form>
                             ) : (

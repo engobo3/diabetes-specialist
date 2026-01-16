@@ -1,4 +1,4 @@
-const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, createPatient, updatePatient, deletePatient, migrateToFirestore, getVitals, addVital, getPatientDocuments, addPatientDocument } = require('../services/database');
+const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, createPatient, updatePatient, deletePatient, migrateToFirestore, getVitals, addVital, getPatientDocuments, addPatientDocument, getMedicalRecords, addMedicalRecord } = require('../services/database');
 
 const getAllPatients = async (req, res) => {
     try {
@@ -127,6 +127,24 @@ const addDocument = async (req, res) => {
     }
 };
 
+const getPatientRecords = async (req, res) => {
+    try {
+        const records = await getMedicalRecords(req.params.id);
+        res.json(records);
+    } catch (error) {
+        res.status(500).json({ message: 'Error reading medical records' });
+    }
+};
+
+const addPatientRecord = async (req, res) => {
+    try {
+        const newRecord = await addMedicalRecord(req.params.id, req.body);
+        res.status(201).json(newRecord);
+    } catch (error) {
+        res.status(500).json({ message: 'Error adding medical record' });
+    }
+};
+
 module.exports = {
     getPatients: getAllPatients,
     getPatientById: getPatient,
@@ -137,5 +155,7 @@ module.exports = {
     updatePatient: updateExistingPatient,
     deletePatient: deleteExistingPatient,
     getDocuments,
-    addDocument
+    addDocument,
+    getPatientRecords,
+    addPatientRecord
 };

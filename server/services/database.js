@@ -827,5 +827,7 @@ module.exports = {
     createPayment,
     attachDoctorInfo,
     getPatientDocuments,
-    addPatientDocument
+    addPatientDocument,
+    getMedicalRecords,
+    addMedicalRecord
 };
