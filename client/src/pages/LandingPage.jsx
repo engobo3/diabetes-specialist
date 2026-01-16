@@ -11,7 +11,6 @@ const LandingPage = () => {
     const [diabetesDoctors, setDiabetesDoctors] = useState([]);
 
     useEffect(() => {
-        console.log("Fetching doctors from:", `${import.meta.env.VITE_API_URL}/api/doctors`);
         fetch(`${import.meta.env.VITE_API_URL}/api/doctors`)
             .then(res => res.json())
             .then(data => {
