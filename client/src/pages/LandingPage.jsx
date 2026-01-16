@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useInstallPrompt from '../hooks/useInstallPrompt';
 import Header from '../components/Header';
@@ -8,6 +8,21 @@ import Button from '../components/ui/Button';
 
 const LandingPage = () => {
     const { isInstallable, promptInstall } = useInstallPrompt();
+    const [diabetesDoctors, setDiabetesDoctors] = useState([]);
+
+    useEffect(() => {
+        fetch(`${import.meta.env.VITE_API_URL}/api/doctors`)
+            .then(res => res.json())
+            .then(data => {
+                // Filter for diabetes specialists (Endocrinologist, Pediatric Diabetologist)
+                const specialists = data.filter(doc =>
+                    doc.specialty === 'Endocrinologist' ||
+                    doc.specialty === 'Pediatric Diabetologist'
+                ).slice(0, 3); // Limit to 3
+                setDiabetesDoctors(specialists);
+            })
+            .catch(err => console.error("Failed to load doctors", err));
+    }, []);
 
     // Quick Action Tiles Data
     const quickActions = [
@@ -122,37 +137,33 @@ const LandingPage = () => {
             {/* Team Preview Section */}
             <section id="doctors" className="bg-slate-50 py-20 border-t border-gray-200">
                 <div className="container mx-auto px-4 text-center">
-                    <h2 className="text-3xl font-serif font-bold text-gray-900 mb-6">Meet Our Specialists</h2>
+                    <h2 className="text-3xl font-serif font-bold text-gray-900 mb-6">Rencontrez Nos Spécialistes</h2>
                     <p className="text-lg text-gray-600 mb-12 max-w-2xl mx-auto">
-                        Our team of board-certified experts is dedicated to providing personalized care for your diabetes journey.
+                        Notre équipe d'experts certifiés est dédiée à fournir des soins personnalisés pour votre parcours avec le diabète.
                     </p>
 
                     <div className="flex justify-center flex-wrap gap-8 mb-12">
-                        <Link to="/doctor/1" className="group">
-                            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-xl transition-all border border-gray-100 w-72">
-                                <div className="relative w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-slate-50 shadow-inner">
-                                    <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="Dr. Connor" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                </div>
-                                <h3 className="font-bold text-xl text-gray-900 mb-1">Dr. Sarah Connor</h3>
-                                <p className="text-primary font-medium text-sm mb-4 uppercase tracking-wide">Endocrinologist</p>
-                                <div className="text-sm font-semibold text-blue-600 group-hover:underline">View Profile &rarr;</div>
-                            </div>
-                        </Link>
-                        <Link to="/doctor/2" className="group">
-                            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-xl transition-all border border-gray-100 w-72">
-                                <div className="relative w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-slate-50 shadow-inner">
-                                    <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Dr. Kim" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                </div>
-                                <h3 className="font-bold text-xl text-gray-900 mb-1">Dr. John Kim</h3>
-                                <p className="text-primary font-medium text-sm mb-4 uppercase tracking-wide">Pediatric Specialist</p>
-                                <div className="text-sm font-semibold text-blue-600 group-hover:underline">View Profile &rarr;</div>
-                            </div>
-                        </Link>
+                        {diabetesDoctors.length > 0 ? (
+                            diabetesDoctors.map(doctor => (
+                                <Link key={doctor.id} to={`/doctor/${doctor.id}`} className="group">
+                                    <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-xl transition-all border border-gray-100 w-72">
+                                        <div className="relative w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-slate-50 shadow-inner">
+                                            <img src={doctor.image} alt={doctor.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        </div>
+                                        <h3 className="font-bold text-xl text-gray-900 mb-1">{doctor.name}</h3>
+                                        <p className="text-primary font-medium text-sm mb-4 uppercase tracking-wide">{doctor.specialty}</p>
+                                        <div className="text-sm font-semibold text-blue-600 group-hover:underline">Voir Profil &rarr;</div>
+                                    </div>
+                                </Link>
+                            ))
+                        ) : (
+                            <div className="w-full text-center p-4">Chargement des spécialistes...</div>
+                        )}
                     </div>
 
                     <Link to="/find-doctor">
                         <Button className="bg-white text-primary border-2 border-primary hover:bg-primary hover:text-white px-8 py-3 text-lg font-semibold rounded-full transition-colors">
-                            Search Our Full Doctor Network
+                            Rechercher Tout Notre Réseau de Médecins
                         </Button>
                     </Link>
                 </div>
