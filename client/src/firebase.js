@@ -13,8 +13,33 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
-const analytics = getAnalytics(app);
+let app;
+export let auth;
+export let storage;
+let analytics;
+
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.warn("Firebase App could not be initialized:", e);
+}
+
+if (app) {
+  try {
+    auth = getAuth(app);
+  } catch (e) {
+    console.warn("Firebase Auth could not be initialized:", e);
+  }
+
+  try {
+    storage = getStorage(app);
+  } catch (e) {
+    console.warn("Firebase Storage could not be initialized:", e);
+  }
+
+  try {
+    analytics = getAnalytics(app);
+  } catch (e) {
+    console.warn("Firebase Analytics could not be initialized:", e);
+  }
+}

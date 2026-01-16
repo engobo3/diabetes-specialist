@@ -14,17 +14,30 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     const login = (email, password) => {
+        if (!auth) return Promise.reject("Auth not initialized");
         return signInWithEmailAndPassword(auth, email, password);
     };
 
     const logout = () => {
         setUserRole(null);
         setPatientId(null);
+        if (!auth) return Promise.resolve();
         return signOut(auth);
     };
 
     useEffect(() => {
+        // Safety timeout to ensure loading is set to false even if Firebase hangs
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 2000);
+
+        if (!auth) {
+            console.warn("Auth not initialized, skipping auth listener");
+            return;
+        }
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            clearTimeout(timer);
             setCurrentUser(user);
 
             if (user) {

@@ -5,7 +5,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
-import { get, set, del } from 'idb-keyval';
 
 // Lazy load pages for performance
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -41,13 +40,9 @@ const queryClient = new QueryClient({
     },
 });
 
-// Create a persister using IDB-Keyval
+// Create a persister using localStorage (synchronous)
 const persister = createSyncStoragePersister({
-    storage: {
-        getItem: async (key) => await get(key),
-        setItem: async (key, value) => await set(key, value),
-        removeItem: async (key) => await del(key),
-    },
+    storage: window.localStorage,
 });
 
 const ProtectedRoute = ({ children }) => {

@@ -26,14 +26,20 @@ const seedDoctorsIfNeeded = async () => {
 
 const getDoctors = async (req, res) => {
     try {
-        await seedDoctorsIfNeeded(); // Ensure data exists
-
-        const snapshot = await db.collection('doctors').get();
-        const doctors = [];
-        snapshot.forEach(doc => {
-            doctors.push({ id: doc.id, ...doc.data() });
-        });
-        res.json(doctors);
+        try {
+            await seedDoctorsIfNeeded(); // Ensure data exists
+            const snapshot = await db.collection('doctors').get();
+            const doctors = [];
+            snapshot.forEach(doc => {
+                doctors.push({ id: doc.id, ...doc.data() });
+            });
+            res.json(doctors);
+        } catch (dbError) {
+            console.warn("DB access failed, falling back to local file:", dbError.message);
+            const data = fs.readFileSync(dataPath, 'utf8');
+            const doctors = JSON.parse(data);
+            res.json(doctors);
+        }
     } catch (error) {
         console.error("Error getting doctors:", error);
         res.status(500).json({ message: 'Error retrieving doctors' });
@@ -43,20 +49,31 @@ const getDoctors = async (req, res) => {
 const getDoctorById = async (req, res) => {
     try {
         const id = req.params.id;
-        // Try to get by document ID (string) or query by integer ID field if legacy
-        let doc = await db.collection('doctors').doc(id).get();
+        try {
+            // Try to get by document ID (string) or query by integer ID field if legacy
+            let doc = await db.collection('doctors').doc(id).get();
 
-        if (!doc.exists) {
-            // Fallback: Query by 'id' field (integer) for legacy mock data
-            const snapshot = await db.collection('doctors').where('id', '==', parseInt(id)).limit(1).get();
-            if (!snapshot.empty) {
-                doc = snapshot.docs[0];
+            if (!doc.exists) {
+                // Fallback: Query by 'id' field (integer) for legacy mock data
+                const snapshot = await db.collection('doctors').where('id', '==', parseInt(id)).limit(1).get();
+                if (!snapshot.empty) {
+                    doc = snapshot.docs[0];
+                } else {
+                    return res.status(404).json({ message: 'Doctor not found' });
+                }
+            }
+            res.json({ id: doc.id, ...doc.data() });
+        } catch (dbError) {
+            console.warn("DB access failed, falling back to local file:", dbError.message);
+            const data = fs.readFileSync(dataPath, 'utf8');
+            const doctors = JSON.parse(data);
+            const doctor = doctors.find(d => d.id.toString() === id || d.id === parseInt(id));
+            if (doctor) {
+                res.json(doctor);
             } else {
-                return res.status(404).json({ message: 'Doctor not found' });
+                res.status(404).json({ message: 'Doctor not found' });
             }
         }
-
-        res.json({ id: doc.id, ...doc.data() });
     } catch (error) {
         console.error("Error getting doctor:", error);
         res.status(500).json({ message: 'Error retrieving doctor' });
