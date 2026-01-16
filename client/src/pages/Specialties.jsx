@@ -8,7 +8,7 @@ const Specialties = () => {
 
     const specialties = [
         {
-            id: 'diabetes',
+            id: 'Endocrinologist',
             name: 'Diabétologue',
             icon: Activity,
             description: 'Spécialistes du diabète et troubles métaboliques.',
@@ -16,44 +16,44 @@ const Specialties = () => {
             count: 'Disponible'
         },
         {
-            id: 'cardiology',
+            id: 'Cardiologist',
             name: 'Cardiologue',
             icon: Heart,
             description: 'Santé cardiaque et prévention.',
-            active: false,
-            count: 'Bientôt'
+            active: true,
+            count: 'Disponible'
         },
         {
-            id: 'nutrition',
+            id: 'Nutritionist',
             name: 'Nutritionniste',
             icon: Utensils,
             description: 'Plans alimentaires adaptés aux diabétiques.',
-            active: false,
-            count: 'Bientôt'
+            active: true,
+            count: 'Disponible'
         },
         {
-            id: 'pediatrics',
+            id: 'Pediatric Diabetologist',
             name: 'Pédiatrie',
             icon: Baby,
             description: 'Soins pour enfants diabétiques.',
-            active: false,
-            count: 'Bientôt'
+            active: true,
+            count: 'Disponible'
         },
         {
-            id: 'ophthalmology',
+            id: 'Ophthalmologist',
             name: 'Ophtalmologue',
             icon: Eye,
             description: 'Dépistage de la rétinopathie.',
-            active: false,
-            count: 'Bientôt'
+            active: true,
+            count: 'Disponible'
         }
     ];
 
     const handleSelect = (spec) => {
         if (spec.active) {
-            // Navigate to FindDoctor pre-filtered (in a real app we'd pass state)
-            // For now, FindDoctor shows all doctors, which are all Diabetes + Kinshasa anyway.
-            navigate('/find-doctor?specialty=diabetes&city=Kinshasa');
+            // Navigate to FindDoctor pre-filtered with the specialty
+            // Use encodeURIComponent to handle spaces in specialty names
+            navigate(`/find-doctor?specialty=${encodeURIComponent(spec.id)}&city=Kinshasa`);
         }
     };
 

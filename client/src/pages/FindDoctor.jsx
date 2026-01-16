@@ -5,13 +5,19 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import { Search, MapPin, Filter, Star, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const FindDoctor = () => {
+    const [searchParams] = useSearchParams();
     const [doctors, setDoctors] = useState([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedSpecialty, setSelectedSpecialty] = useState('');
+    const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+    const [selectedSpecialty, setSelectedSpecialty] = useState(searchParams.get('specialty') || '');
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setSelectedSpecialty(searchParams.get('specialty') || '');
+        setSearchQuery(searchParams.get('search') || '');
+    }, [searchParams]);
 
     useEffect(() => {
         // Fetch all doctors
