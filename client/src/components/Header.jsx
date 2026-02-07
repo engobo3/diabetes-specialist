@@ -3,8 +3,12 @@ import { Link } from 'react-router-dom';
 import { Phone, Search, Menu, User, MapPin } from 'lucide-react';
 import Button from './ui/Button';
 import BetaBadge from './ui/BetaBadge';
+import RoleSwitcher from './RoleSwitcher';
+import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
+    const { currentUser, userRoles } = useAuth();
+
     return (
         <header className="w-full font-sans">
             {/* Utility Bar (Top) */}
@@ -69,13 +73,24 @@ const Header = () => {
                         <Menu size={24} />
                     </button>
 
-                    {/* Primary Action (MyChart) */}
-                    <div className="hidden lg:block">
-                        <Link to="/login">
-                            <Button className="bg-blue-900 hover:bg-blue-800 text-white border-none shadow-none rounded-full px-6 flex items-center gap-2">
-                                <User size={16} /> Espace Patient / Connexion
-                            </Button>
-                        </Link>
+                    {/* Role Switcher (for users with multiple roles) */}
+                    <div className="hidden lg:flex items-center gap-3">
+                        {currentUser && userRoles && userRoles.length > 1 && <RoleSwitcher />}
+
+                        {/* Primary Action (MyChart) */}
+                        {currentUser ? (
+                            <Link to="/portal">
+                                <Button className="bg-blue-900 hover:bg-blue-800 text-white border-none shadow-none rounded-full px-6 flex items-center gap-2">
+                                    <User size={16} /> Mon Espace
+                                </Button>
+                            </Link>
+                        ) : (
+                            <Link to="/login">
+                                <Button className="bg-blue-900 hover:bg-blue-800 text-white border-none shadow-none rounded-full px-6 flex items-center gap-2">
+                                    <User size={16} /> Espace Patient / Connexion
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

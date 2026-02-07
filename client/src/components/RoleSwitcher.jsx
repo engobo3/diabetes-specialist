@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, Users, Stethoscope } from 'lucide-react';
+import { User, Users, Stethoscope, Shield } from 'lucide-react';
 
 const RoleSwitcher = () => {
   const { userRoles, activeRole, switchRole } = useAuth();
@@ -12,17 +12,26 @@ const RoleSwitcher = () => {
     patient: {
       icon: User,
       label: 'Mon Dossier',
-      color: 'blue'
+      activeClass: 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-200',
+      inactiveClass: 'text-gray-600 hover:bg-gray-50'
     },
     caregiver: {
       icon: Users,
       label: 'Patients Gérés',
-      color: 'green'
+      activeClass: 'bg-green-50 text-green-700 shadow-sm ring-1 ring-green-200',
+      inactiveClass: 'text-gray-600 hover:bg-gray-50'
     },
     doctor: {
       icon: Stethoscope,
       label: 'Espace Médecin',
-      color: 'purple'
+      activeClass: 'bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-200',
+      inactiveClass: 'text-gray-600 hover:bg-gray-50'
+    },
+    admin: {
+      icon: Shield,
+      label: 'Admin',
+      activeClass: 'bg-red-50 text-red-700 shadow-sm ring-1 ring-red-200',
+      inactiveClass: 'text-gray-600 hover:bg-gray-50'
     }
   };
 
@@ -40,9 +49,7 @@ const RoleSwitcher = () => {
             key={role}
             onClick={() => switchRole(role)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              isActive
-                ? `bg-${config.color}-50 text-${config.color}-700 shadow-sm`
-                : 'text-gray-600 hover:bg-gray-50'
+              isActive ? config.activeClass : config.inactiveClass
             }`}
             title={config.label}
           >
