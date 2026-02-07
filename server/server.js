@@ -40,6 +40,7 @@ app.use('/api/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/prescriptions', require('./routes/prescriptionRoutes'));
 app.use('/api/doctors', require('./routes/doctorRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/2fa', require('./routes/twoFactorAuthRoutes'));

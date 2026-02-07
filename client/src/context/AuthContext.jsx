@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
             setPatientId(patientData.id);
         } else if (newRole === 'caregiver' && managedPatients.length > 0) {
             setPatientId(managedPatients[0].id);
-        } else if (newRole === 'doctor') {
+        } else if (newRole === 'doctor' || newRole === 'admin') {
             setPatientId(null);
         }
     };
@@ -85,8 +85,8 @@ export const AuthProvider = ({ children }) => {
                         patientLookupUrl = `${apiUrl}/api/patients/lookup?phone=${phone}`;
                     }
 
-                    // Check ALL roles in parallel
-                    const [patientRes, caregiverRes, doctorRes] = await Promise.all([
+                    // Check ALL roles in parallel (including admin)
+                    const [patientRes, caregiverRes, doctorRes, userProfileRes] = await Promise.all([
                         fetch(patientLookupUrl, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         }).catch(e => ({ ok: false, error: e })),
@@ -94,6 +94,9 @@ export const AuthProvider = ({ children }) => {
                             headers: { 'Authorization': `Bearer ${token}` }
                         }).catch(e => ({ ok: false, error: e })),
                         fetch(`${apiUrl}/api/doctors/lookup?email=${user.email}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        }).catch(e => ({ ok: false, error: e })),
+                        fetch(`${apiUrl}/api/users/me`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         }).catch(e => ({ ok: false, error: e }))
                     ]);
@@ -147,7 +150,19 @@ export const AuthProvider = ({ children }) => {
 
                         // If not already patient or caregiver, set doctor as default
                         if (!defaultRole) {
-                            defaultRole = doctorRecord.role || 'doctor';
+                            defaultRole = 'doctor';
+                        }
+                    }
+
+                    // Check if user is an admin
+                    if (userProfileRes.ok) {
+                        const userProfile = await userProfileRes.json();
+                        if (userProfile.role === 'admin') {
+                            roles.push('admin');
+                            // If user is admin+doctor, default to doctor for daily use
+                            if (!defaultRole) {
+                                defaultRole = 'admin';
+                            }
                         }
                     }
 
