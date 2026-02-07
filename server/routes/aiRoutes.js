@@ -134,15 +134,15 @@ router.post('/forecast', async (req, res) => {
 
             const prompt = `
             Act as a medical data analyst. Analyze the following ${type} readings from a diabetes patient.
-            
+
             Data (Chronological):
             ${JSON.stringify(history)}
-    
+
             Task:
             1. Identify the trend (stable, rising, falling, fluctuating).
             2. Predict the next 3 probable values (one per day starting after the last date).
             3. Provide a brief 1-sentence medical insight or advice based on the trend.
-    
+
             Output Format:
             STRICTLY return a valid JSON object with no markdown formatting.
             {
@@ -209,6 +209,267 @@ router.post('/forecast', async (req, res) => {
         console.error("AI Forecast Error:", error);
         res.status(500).json({
             error: "Failed to generate forecast",
+            details: error.message
+        });
+    }
+});
+
+
+/**
+ * Comprehensive Health Analysis
+ * Analyzes all patient vitals, prescriptions, and conditions to provide personalized insights
+ */
+router.post('/analyze-health', async (req, res) => {
+    try {
+        const { patientData, vitals, prescriptions, timeframe } = req.body;
+
+        if (!patientData || !vitals) {
+            return res.status(400).json({ error: "Patient data and vitals are required" });
+        }
+
+        let analysis;
+
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+            // Prepare comprehensive data summary
+            const dataContext = {
+                patient: {
+                    type: patientData.type || 'Type 2',
+                    conditions: patientData.conditions || [],
+                    allergies: patientData.allergies || [],
+                    age: patientData.age,
+                    gender: patientData.gender
+                },
+                vitals: {
+                    glucose: vitals.readings?.filter(v => v.category === 'Glucose' || !v.category).slice(-14) || [],
+                    bloodPressure: vitals.readings?.filter(v => v.category === 'Blood Pressure').slice(-7) || [],
+                    weight: vitals.readings?.filter(v => v.category === 'Weight').slice(-7) || [],
+                    heartRate: vitals.readings?.filter(v => v.category === 'Heart Rate').slice(-7) || []
+                },
+                medications: prescriptions?.map(p => ({
+                    name: p.medication,
+                    dosage: p.dosage,
+                    instructions: p.instructions
+                })) || [],
+                timeframe: timeframe || '14 days'
+            };
+
+            const prompt = `
+            You are an expert diabetes specialist and medical data analyst. Analyze the following comprehensive patient data and provide personalized health insights and recommendations.
+
+            PATIENT PROFILE:
+            ${JSON.stringify(dataContext.patient, null, 2)}
+
+            VITAL SIGNS (Last ${dataContext.timeframe}):
+            ${JSON.stringify(dataContext.vitals, null, 2)}
+
+            CURRENT MEDICATIONS:
+            ${JSON.stringify(dataContext.medications, null, 2)}
+
+            TASKS:
+            1. Analyze ALL vital trends (glucose, blood pressure, weight, heart rate)
+            2. Identify concerning patterns or improvements
+            3. Assess medication effectiveness based on trends
+            4. Provide risk assessment (low, moderate, high)
+            5. Generate 3-5 personalized, actionable recommendations
+            6. Suggest lifestyle modifications specific to their data
+
+            IMPORTANT:
+            - Be empathetic and encouraging
+            - Provide specific, actionable advice
+            - Always recommend consulting their doctor for major concerns
+            - Respond in French
+            - Focus on diabetes management context
+
+            OUTPUT FORMAT (STRICT JSON, no markdown):
+            {
+                "overallStatus": "excellent|good|fair|concerning",
+                "healthScore": 0-100,
+                "trends": {
+                    "glucose": { "status": "stable|improving|worsening", "average": number, "concern": "low|medium|high" },
+                    "bloodPressure": { "status": "stable|improving|worsening", "average": "120/80", "concern": "low|medium|high" },
+                    "weight": { "status": "stable|improving|worsening", "change": "+/-X kg", "concern": "low|medium|high" },
+                    "heartRate": { "status": "stable|improving|worsening", "average": number, "concern": "low|medium|high" }
+                },
+                "riskAssessment": {
+                    "level": "low|moderate|high",
+                    "factors": ["factor1", "factor2"],
+                    "urgentConcerns": ["concern1"] or []
+                },
+                "insights": [
+                    { "type": "positive|warning|info", "title": "Titre court", "message": "Explication détaillée" }
+                ],
+                "recommendations": [
+                    { "category": "nutrition|exercise|medication|monitoring", "priority": "high|medium|low", "action": "Action spécifique à prendre" }
+                ],
+                "nextSteps": ["Étape 1", "Étape 2", "Étape 3"]
+            }
+            `;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text();
+
+            // Cleanup markdown if present
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            analysis = JSON.parse(text);
+
+        } catch (aiError) {
+            console.warn("Gemini Health Analysis failed, using fallback.", aiError.message);
+
+            // Intelligent fallback analysis
+            const glucoseReadings = vitals.readings?.filter(v => v.category === 'Glucose' || !v.category) || [];
+            const bpReadings = vitals.readings?.filter(v => v.category === 'Blood Pressure') || [];
+            const weightReadings = vitals.readings?.filter(v => v.category === 'Weight') || [];
+
+            // Calculate glucose average
+            const avgGlucose = glucoseReadings.length > 0
+                ? Math.round(glucoseReadings.reduce((sum, r) => sum + (r.glucose || r.value || 0), 0) / glucoseReadings.length)
+                : 0;
+
+            // Assess glucose status
+            let glucoseStatus = "stable";
+            let glucoseConcern = "low";
+            if (avgGlucose > 180) {
+                glucoseStatus = "worsening";
+                glucoseConcern = "high";
+            } else if (avgGlucose < 70) {
+                glucoseStatus = "worsening";
+                glucoseConcern = "high";
+            } else if (avgGlucose > 140) {
+                glucoseConcern = "medium";
+            }
+
+            // Determine overall status
+            let overallStatus = "good";
+            let healthScore = 75;
+            if (glucoseConcern === "high") {
+                overallStatus = "concerning";
+                healthScore = 50;
+            } else if (glucoseConcern === "medium") {
+                overallStatus = "fair";
+                healthScore = 65;
+            } else if (avgGlucose >= 80 && avgGlucose <= 120) {
+                overallStatus = "excellent";
+                healthScore = 90;
+            }
+
+            // Generate insights
+            const insights = [];
+            if (avgGlucose > 180) {
+                insights.push({
+                    type: "warning",
+                    title: "Glycémie élevée détectée",
+                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL, ce qui est au-dessus de la cible. Il est important de consulter votre médecin.`
+                });
+            } else if (avgGlucose < 70) {
+                insights.push({
+                    type: "warning",
+                    title: "Hypoglycémie détectée",
+                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL. Attention aux hypoglycémies. Consultez votre médecin pour ajuster votre traitement.`
+                });
+            } else if (avgGlucose >= 80 && avgGlucose <= 120) {
+                insights.push({
+                    type: "positive",
+                    title: "Excellent contrôle glycémique",
+                    message: `Votre glycémie moyenne de ${avgGlucose} mg/dL est dans la cible optimale. Continuez comme ça !`
+                });
+            } else {
+                insights.push({
+                    type: "info",
+                    title: "Contrôle glycémique acceptable",
+                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL. Quelques ajustements pourraient l'améliorer.`
+                });
+            }
+
+            // Add weight insight if data available
+            if (weightReadings.length > 1) {
+                const weightChange = weightReadings[weightReadings.length - 1].value - weightReadings[0].value;
+                if (Math.abs(weightChange) > 2) {
+                    insights.push({
+                        type: "info",
+                        title: weightChange > 0 ? "Prise de poids détectée" : "Perte de poids détectée",
+                        message: `Vous avez ${weightChange > 0 ? 'gagné' : 'perdu'} ${Math.abs(weightChange).toFixed(1)} kg sur la période analysée.`
+                    });
+                }
+            }
+
+            // Generate recommendations
+            const recommendations = [
+                {
+                    category: "monitoring",
+                    priority: "high",
+                    action: "Mesurez votre glycémie à jeun chaque matin et 2h après les repas principaux"
+                },
+                {
+                    category: "nutrition",
+                    priority: "high",
+                    action: "Privilégiez les légumes, protéines maigres et céréales complètes. Limitez les sucres rapides."
+                },
+                {
+                    category: "exercise",
+                    priority: "medium",
+                    action: "Marchez 30 minutes par jour, de préférence après les repas pour stabiliser la glycémie"
+                }
+            ];
+
+            if (avgGlucose > 140) {
+                recommendations.push({
+                    category: "medication",
+                    priority: "high",
+                    action: "Discutez avec votre médecin d'un possible ajustement de votre traitement"
+                });
+            }
+
+            analysis = {
+                overallStatus,
+                healthScore,
+                trends: {
+                    glucose: {
+                        status: glucoseStatus,
+                        average: avgGlucose,
+                        concern: glucoseConcern
+                    },
+                    bloodPressure: {
+                        status: "stable",
+                        average: bpReadings.length > 0 ? `${bpReadings[bpReadings.length - 1].systolic}/${bpReadings[bpReadings.length - 1].diastolic}` : "N/A",
+                        concern: "low"
+                    },
+                    weight: {
+                        status: "stable",
+                        change: weightReadings.length > 1
+                            ? `${(weightReadings[weightReadings.length - 1].value - weightReadings[0].value).toFixed(1)} kg`
+                            : "N/A",
+                        concern: "low"
+                    },
+                    heartRate: {
+                        status: "stable",
+                        average: 0,
+                        concern: "low"
+                    }
+                },
+                riskAssessment: {
+                    level: glucoseConcern === "high" ? "high" : glucoseConcern === "medium" ? "moderate" : "low",
+                    factors: avgGlucose > 180 ? ["Glycémie chroniquement élevée", "Risque de complications"] : [],
+                    urgentConcerns: avgGlucose > 250 || avgGlucose < 60 ? ["Consulter un médecin rapidement"] : []
+                },
+                insights,
+                recommendations,
+                nextSteps: [
+                    "Continuez à enregistrer vos mesures quotidiennement",
+                    "Suivez les recommandations nutritionnelles personnalisées",
+                    "Planifiez votre prochain rendez-vous médical si nécessaire"
+                ]
+            };
+        }
+
+        res.json(analysis);
+
+    } catch (error) {
+        console.error("AI Health Analysis Error:", error);
+        res.status(500).json({
+            error: "Failed to analyze health data",
             details: error.message
         });
     }

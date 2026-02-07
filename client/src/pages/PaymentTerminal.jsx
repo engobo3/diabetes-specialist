@@ -4,6 +4,7 @@ import { Search, CreditCard, User, CheckCircle, Printer } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import PaymentForm from '../components/PaymentForm';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import BetaBadge from '../components/ui/BetaBadge';
 
 const PaymentTerminal = () => {
     const { doctorProfile } = useAuth();
@@ -41,7 +42,9 @@ const PaymentTerminal = () => {
         <div className="p-6 max-w-4xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Terminal de Paiement (POS)</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        Terminal de Paiement (POS) <BetaBadge />
+                    </h1>
                     <p className="text-gray-500">Encaissement pour consultations et services</p>
                 </div>
                 <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -108,8 +111,8 @@ const PaymentTerminal = () => {
                                             key={patient.id}
                                             onClick={() => setSelectedPatient(patient)}
                                             className={`p-3 cursor-pointer transition-colors flex items-center justify-between ${selectedPatient?.id === patient.id
-                                                    ? 'bg-blue-50 border-l-4 border-blue-600'
-                                                    : 'hover:bg-gray-50'
+                                                ? 'bg-blue-50 border-l-4 border-blue-600'
+                                                : 'hover:bg-gray-50'
                                                 }`}
                                         >
                                             <div>

@@ -9,10 +9,15 @@ const DoctorProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const { userRole } = useAuth();
+    const { userRole, currentUser, doctorProfile } = useAuth();
     const [doctor, setDoctor] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Debug logging
+    useEffect(() => {
+        console.log('DoctorProfile - userRole:', userRole, 'currentUser:', currentUser?.email, 'doctorProfile:', doctorProfile);
+    }, [userRole, currentUser, doctorProfile]);
 
     useEffect(() => {
         const fetchDoctor = async () => {
@@ -36,8 +41,10 @@ const DoctorProfile = () => {
 
     const deleteDoctorMutation = useMutation({
         mutationFn: async () => {
+            const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/doctors/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Failed to delete doctor');
             return response.json();
@@ -109,6 +116,13 @@ const DoctorProfile = () => {
                                             <Trash2 size={16} /> Supprimer
                                         </Button>
                                     </>
+                                )}
+                                {(userRole === 'doctor' || userRole === 'admin' || doctorProfile?.id) && currentUser && (
+                                    <Link to="/doctor-dashboard">
+                                        <Button className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm">
+                                            <Award size={16} /> Mon tableau de bord
+                                        </Button>
+                                    </Link>
                                 )}
                                 <a
                                     href={`mailto:${doctor.contact.email}`}

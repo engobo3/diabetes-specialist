@@ -1,4 +1,5 @@
 const { db } = require('../config/firebase');
+const { validateDoctor } = require('../utils/validation');
 const fs = require('fs');
 const path = require('path');
 
@@ -104,9 +105,10 @@ const lookupDoctorByEmail = async (req, res) => {
 const addDoctor = async (req, res) => {
     try {
         const newDoctor = req.body;
-        // Basic validation
-        if (!newDoctor.name || !newDoctor.specialty) {
-            return res.status(400).json({ message: 'Name and Specialty are required' });
+
+        const { isValid, error } = validateDoctor(newDoctor);
+        if (!isValid) {
+            return res.status(400).json({ message: error });
         }
 
         // Add to Firestore
@@ -124,6 +126,36 @@ const updateDoctor = async (req, res) => {
     try {
         const id = req.params.id;
         const updates = req.body;
+
+        // Note: For updates, ideally we merge and validate.
+        if (Object.keys(updates).length > 0) {
+            // We can't easily validate partial updates against the full schema without fetching first.
+            // But let's check if the fields provided are at least superficially valid if they are schema fields.
+            // Or, we can choose to only validate on creation for simplicity, or fetch-merge-validate.
+            // Let's do fetch-merge-validate for robustness.
+
+            let existingDoc = null;
+            const docRef = db.collection('doctors').doc(id);
+            const docShot = await docRef.get();
+
+            if (docShot.exists) {
+                existingDoc = docShot.data();
+            } else {
+                // Check legacy
+                const snapshot = await db.collection('doctors').where('id', '==', parseInt(id)).limit(1).get();
+                if (!snapshot.empty) {
+                    existingDoc = snapshot.docs[0].data();
+                }
+            }
+
+            if (existingDoc) {
+                const merged = { ...existingDoc, ...updates };
+                const { isValid, error } = validateDoctor(merged);
+                if (!isValid) {
+                    return res.status(400).json({ message: error });
+                }
+            }
+        }
 
         const docRef = db.collection('doctors').doc(id);
         const doc = await docRef.get();

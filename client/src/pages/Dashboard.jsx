@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import BetaBadge from '../components/ui/BetaBadge';
 import Input from '../components/ui/Input';
 import Skeleton from '../components/ui/Skeleton';
 import { MessageSquare, Plus, Trash2, Edit, ChevronRight, Calendar, User, Activity, LogOut, Banknote, CreditCard } from 'lucide-react'; // Assuming lucide-react is installed
@@ -11,42 +12,63 @@ import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
     const queryClient = useQueryClient();
-    const { userRole, doctorProfile } = useAuth();
+    const { userRole, doctorProfile, currentUser } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
 
     // Fetch Patients
     const { data: patients = [], isLoading: loadingPatients } = useQuery({
         queryKey: ['patients', doctorProfile?.id],
-        queryFn: () => {
-            if (!doctorProfile?.id) return [];
-            return fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`)
-                .then(res => {
-                    if (!res.ok) throw new Error('Network response was not ok');
+        queryFn: async () => {
+            if (!doctorProfile?.id || !currentUser) return [];
+            const token = await currentUser.getIdToken();
+            return fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        console.error("Fetch Patients Error:", res.status, res.statusText, errText);
+                        throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+                    }
                     return res.json();
                 });
         },
-        enabled: !!doctorProfile?.id,
+        enabled: !!doctorProfile?.id && !!currentUser,
     });
 
     // Fetch Appointments
     const { data: appointments = [], isLoading: loadingApts } = useQuery({
         queryKey: ['appointments', doctorProfile?.id],
-        queryFn: () => {
-            if (!doctorProfile?.id) return [];
-            return fetch(`${import.meta.env.VITE_API_URL}/api/appointments?doctorId=${doctorProfile.id}`)
-                .then(res => {
-                    if (!res.ok) throw new Error('Network response was not ok');
+        queryFn: async () => {
+            if (!doctorProfile?.id || !currentUser) return [];
+            const token = await currentUser.getIdToken();
+            return fetch(`${import.meta.env.VITE_API_URL || ''}/api/appointments?doctorId=${doctorProfile.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        console.error("Fetch Appointments Error:", res.status, res.statusText, errText);
+                        throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+                    }
                     return res.json();
                 });
         },
-        enabled: !!doctorProfile?.id,
+        enabled: !!doctorProfile?.id && !!currentUser,
     });
 
     const loading = loadingPatients || loadingApts;
 
     // Delete Mutation
+    // Delete Mutation
     const deletePatientMutation = useMutation({
-        mutationFn: (id) => fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, { method: 'DELETE' }),
+        mutationFn: async (id) => {
+            const token = await currentUser.getIdToken();
+            return fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['patients'] });
         },
@@ -54,11 +76,14 @@ const Dashboard = () => {
 
     // Update Status Mutation
     const updateStatusMutation = useMutation({
-        mutationFn: ({ id, status }) => fetch(`${import.meta.env.VITE_API_URL}/api/appointments/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-        }),
+        mutationFn: async ({ id, status }) => {
+            const token = await currentUser.getIdToken();
+            return fetch(`${import.meta.env.VITE_API_URL}/api/appointments/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status })
+            });
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['appointments'] });
         },
@@ -82,7 +107,7 @@ const Dashboard = () => {
             <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
                 <div className="container flex items-center justify-between h-16">
                     <div className="text-xl font-bold text-primary flex items-center gap-2">
-                        <Activity className="text-primary" size={24} /> GlucoSoin <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Tableau de Bord</span>
+                        <Activity className="text-primary" size={24} /> GlucoSoin <BetaBadge /> <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Tableau de Bord</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="text-sm font-medium text-gray-700 hidden sm:block">

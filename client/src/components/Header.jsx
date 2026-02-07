@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Search, Menu, User, MapPin } from 'lucide-react';
 import Button from './ui/Button';
+import BetaBadge from './ui/BetaBadge';
 
 const Header = () => {
     return (
@@ -16,7 +17,7 @@ const Header = () => {
                     </div>
                     <div className="flex gap-4 items-center">
                         <span className="flex items-center gap-1 hover:text-white cursor-pointer">
-                            <Phone size={12} /> (243) 99 555 0100
+                            <Phone size={12} /> +243 81 000 0000
                         </span>
                         <span className="flex items-center gap-1 hover:text-white cursor-pointer">
                             <MapPin size={12} /> Nos Centres
@@ -38,6 +39,7 @@ const Header = () => {
                         <div className="flex flex-col">
                             <span className="text-xl font-bold text-gray-900 leading-tight group-hover:text-primary transition-colors">
                                 GlucoSoin
+                                <BetaBadge />
                             </span>
                             <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
                                 Centre Médical

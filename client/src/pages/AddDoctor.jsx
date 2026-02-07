@@ -7,11 +7,13 @@ import { Card, CardContent } from '../components/ui/Card';
 import { UserPlus, Save } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { storage } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const AddDoctor = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { currentUser } = useAuth();
     const [uploading, setUploading] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -28,9 +30,13 @@ const AddDoctor = () => {
 
     const addDoctorMutation = useMutation({
         mutationFn: async (newDoctor) => {
+            const token = await currentUser.getIdToken(); // Needs currentUser
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/doctors`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(newDoctor)
             });
             if (!response.ok) throw new Error('Failed to add doctor');

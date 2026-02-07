@@ -4,7 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+import { get, set, del } from 'idb-keyval';
+import { Toaster, toast } from 'react-hot-toast';
 
 // Lazy load pages for performance
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -15,6 +16,7 @@ const EditPatient = lazy(() => import('./pages/EditPatient'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const DoctorMessaging = lazy(() => import('./pages/DoctorMessaging'));
+const DoctorDashboard = lazy(() => import('./pages/DoctorDashboard'));
 const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
 const FindDoctor = lazy(() => import('./pages/FindDoctor'));
@@ -22,6 +24,8 @@ const AddDoctor = lazy(() => import('./pages/AddDoctor'));
 const EditDoctor = lazy(() => import('./pages/EditDoctor'));
 const PaymentTerminal = lazy(() => import('./pages/PaymentTerminal'));
 const Specialties = lazy(() => import('./pages/Specialties'));
+const About = lazy(() => import('./pages/About'));
+const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -30,20 +34,41 @@ const LoadingSpinner = () => (
     </div>
 );
 
-// Create a client
-const queryClient = new QueryClient({
+// Create a client definition
+const createQueryClient = () => new QueryClient({
     defaultOptions: {
         queries: {
             gcTime: 1000 * 60 * 60 * 24, // 24 hours
             staleTime: 1000 * 60 * 5, // 5 minutes
         },
+        mutations: {
+            onError: (error) => {
+                console.error("Mutation Error:", error);
+                toast.error(`Une erreur est survenue: ${error.message || 'Erreur inconnue'}`);
+            }
+        }
     },
 });
 
-// Create a persister using localStorage (synchronous)
-const persister = createSyncStoragePersister({
-    storage: window.localStorage,
-});
+const queryClient = createQueryClient();
+// Add global query cache listener for errors
+queryClient.getQueryCache().config.onError = (error) => {
+    console.error("Query Error:", error);
+    toast.error(`Erreur de chargement: ${error.message || 'Données inacessibles'}`);
+};
+
+// Create an async persister using IndexedDB
+const persister = {
+    persistClient: async (client) => {
+        await set('reactQueryClient', client);
+    },
+    restoreClient: async () => {
+        return await get('reactQueryClient');
+    },
+    removeClient: async () => {
+        await del('reactQueryClient');
+    },
+};
 
 const ProtectedRoute = ({ children }) => {
     const { currentUser, loading } = useAuth();
@@ -65,18 +90,22 @@ function App() {
             }}
         >
             <AuthProvider>
+                <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
                 <Router>
                     <Suspense fallback={<LoadingSpinner />}>
                         <Routes>
                             <Route path="/" element={<LandingPage />} />
+                            <Route path="/about" element={<About />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
+                            <Route path="/accept-invitation" element={<AcceptInvitation />} />
                             <Route path="/specialties" element={<Specialties />} />
                             <Route path="/find-doctor" element={<FindDoctor />} />
                             <Route path="/add-doctor" element={<ProtectedRoute><AddDoctor /></ProtectedRoute>} />
                             <Route path="/edit-doctor/:id" element={<ProtectedRoute><EditDoctor /></ProtectedRoute>} />
                             <Route path="/doctor/:id" element={<DoctorProfile />} />
                             <Route path="/messaging" element={<ProtectedRoute><DoctorMessaging /></ProtectedRoute>} />
+                            <Route path="/doctor-dashboard" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
                             <Route path="/terminal" element={<ProtectedRoute><PaymentTerminal /></ProtectedRoute>} />
                             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                             <Route path="/portal" element={<ProtectedRoute><PatientPortal /></ProtectedRoute>} />

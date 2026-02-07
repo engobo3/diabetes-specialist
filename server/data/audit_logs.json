@@ -1,0 +1,191 @@
+[
+  {
+    "id": "audit_1770485075227_llvtkrupg",
+    "timestamp": "2026-02-07T17:24:35.181Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": "Test User"
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485075668_v3u69whbx",
+    "timestamp": "2026-02-07T17:24:35.663Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485076111_gs91owj5a",
+    "timestamp": "2026-02-07T17:24:36.106Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485076654_gpl84sgbe",
+    "timestamp": "2026-02-07T17:24:36.650Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485076664_2mopmcnji",
+    "timestamp": "2026-02-07T17:24:36.656Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_enabled",
+    "description": "2FA successfully enabled for user",
+    "metadata": {},
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077083_ddtzyen3y",
+    "timestamp": "2026-02-07T17:24:37.080Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077090_rfyougeg3",
+    "timestamp": "2026-02-07T17:24:37.085Z",
+    "eventType": "SECURITY",
+    "userId": "test@example.com",
+    "securityEventType": "2fa_setup_failed",
+    "description": "2FA setup validation failed - invalid token",
+    "metadata": {},
+    "severity": "warning",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077100_4n5shoz8k",
+    "timestamp": "2026-02-07T17:24:37.093Z",
+    "eventType": "SECURITY",
+    "userId": "test-user",
+    "securityEventType": "2fa_verified",
+    "description": "2FA verified successfully",
+    "metadata": {
+      "usedBackupCode": false
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077106_steh1bdr5",
+    "timestamp": "2026-02-07T17:24:37.102Z",
+    "eventType": "SECURITY",
+    "userId": "test-user",
+    "securityEventType": "2fa_failed",
+    "description": "Failed 2FA verification attempt",
+    "metadata": {
+      "ipAddress": "192.168.1.1"
+    },
+    "severity": "warning",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077112_3dbvch35o",
+    "timestamp": "2026-02-07T17:24:37.108Z",
+    "eventType": "SECURITY",
+    "userId": "test-user",
+    "securityEventType": "2fa_disabled",
+    "description": "2FA disabled for user",
+    "metadata": {},
+    "severity": "warning",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077119_5lej70rdk",
+    "timestamp": "2026-02-07T17:24:37.115Z",
+    "eventType": "SECURITY",
+    "userId": "test-user",
+    "securityEventType": "2fa_verified",
+    "description": "2FA verified using backup code",
+    "metadata": {
+      "usedBackupCode": true
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077595_c47fw8jvv",
+    "timestamp": "2026-02-07T17:24:37.591Z",
+    "eventType": "SECURITY",
+    "userId": "user1@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485077986_ujs8in98w",
+    "timestamp": "2026-02-07T17:24:37.982Z",
+    "eventType": "SECURITY",
+    "userId": "user2@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485078401_4wp47x1dz",
+    "timestamp": "2026-02-07T17:24:38.398Z",
+    "eventType": "SECURITY",
+    "userId": "user@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  },
+  {
+    "id": "audit_1770485078817_or6h4ec30",
+    "timestamp": "2026-02-07T17:24:38.813Z",
+    "eventType": "SECURITY",
+    "userId": "user@example.com",
+    "securityEventType": "2fa_setup_initiated",
+    "description": "2FA setup initiated for user",
+    "metadata": {
+      "userName": null
+    },
+    "severity": "info",
+    "environment": "test"
+  }
+]

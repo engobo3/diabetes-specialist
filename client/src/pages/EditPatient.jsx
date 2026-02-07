@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function EditPatient() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { currentUser } = useAuth(); // Add this
     const [formData, setFormData] = useState({
         name: '',
         age: '',
@@ -16,8 +18,12 @@ function EditPatient() {
 
     useEffect(() => {
         const fetchPatient = async () => {
+            if (!currentUser) return;
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`);
+                const token = await currentUser.getIdToken();
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (response.ok) {
                     const data = await response.json();
                     setFormData({
@@ -36,22 +42,24 @@ function EditPatient() {
             }
         };
         fetchPatient();
-    }, [id]);
+    }, [id, currentUser]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData),
-        })
-            .then(res => res.json())
-            .then(() => {
-                navigate('/dashboard');
-            })
-            .catch(err => console.error("Error updating patient", err));
+        try {
+            const token = await currentUser.getIdToken();
+            await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData),
+            });
+            navigate('/dashboard');
+        } catch (err) {
+            console.error("Error updating patient", err);
+        }
     };
 
     const handleChange = (e) => {

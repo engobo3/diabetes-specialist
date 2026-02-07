@@ -1,5 +1,28 @@
 [
     {
+        "id": 1,
+        "name": "Dr. Kense Sebertol",
+        "specialty": "Diabetes Specialist",
+        "bio": "Senior diabetes specialist with extensive experience in patient care and medical management. Dedicated to providing comprehensive diabetes management and education.",
+        "education": [
+            "MD, Specialized in Endocrinology",
+            "Board Certified in Diabetes Management"
+        ],
+        "contact": {
+            "email": "kensesebertol@yahoo.fr",
+            "phone": "+33 6 12 34 56 78",
+            "address": "Medical Center, Kinshasa"
+        },
+        "languages": [
+            "French",
+            "English",
+            "Lingala"
+        ],
+        "image": "https://randomuser.me/api/portraits/men/50.jpg",
+        "role": "doctor",
+        "city": "Kinshasa"
+    },
+    {
         "id": 2,
         "name": "Dr. John Kim",
         "specialty": "Pediatric Diabetologist",

@@ -34,11 +34,11 @@ const LandingPage = () => {
 
     // Centers of Excellence Data
     const specialties = [
-        { icon: Activity, title: "Soins du Diabète", desc: "Suivi métabolique avancé et traitement." },
-        { icon: HeartPulse, title: "Cardiologie", desc: "Santé cardiaque complète et soins vasculaires." },
-        { icon: Brain, title: "Neurologie", desc: "Traitement de pointe pour les troubles neurologiques." },
-        { icon: Baby, title: "Pédiatrie", desc: "Soins spécialisés pour nourrissons, enfants et adolescents." },
-        { icon: Stethoscope, title: "Médecine Générale", desc: "Gestion de la santé holistique pour toute la famille." },
+        { icon: Activity, title: "Soins du Diabète", desc: "Suivi métabolique avancé et traitement.", link: "/find-doctor?specialty=Endocrinologist" },
+        { icon: HeartPulse, title: "Cardiologie", desc: "Santé cardiaque complète et soins vasculaires.", link: "/find-doctor?specialty=Cardiologist" },
+        { icon: Brain, title: "Neurologie", desc: "Traitement de pointe pour les troubles neurologiques.", link: "/find-doctor?specialty=Neurologist" },
+        { icon: Baby, title: "Pédiatrie", desc: "Soins spécialisés pour nourrissons, enfants et adolescents.", link: "/find-doctor?specialty=Pediatrician" },
+        { icon: Stethoscope, title: "Médecine Générale", desc: "Gestion de la santé holistique pour toute la famille.", link: "/find-doctor?specialty=General+Practitioner" },
     ];
 
     return (
@@ -70,14 +70,14 @@ const LandingPage = () => {
                         Faire avancer la médecine et transformer des vies grâce à la recherche, l'éducation et la compassion.
                     </p>
                     <div className="flex gap-4">
-                        <Link to="/specialties">
+                        <Link to="/find-doctor">
                             <Button size="lg" className="w-full sm:w-auto px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all">
                                 Trouver un Spécialiste
                             </Button>
                         </Link>
                         <Link to="/login">
                             <Button className="bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm text-lg px-8 py-6">
-                                Accès Démo
+                                Espace Médecin
                             </Button>
                         </Link>
                     </div>
@@ -108,28 +108,30 @@ const LandingPage = () => {
                 <div className="container mx-auto px-4">
                     <div className="text-center mb-12">
                         <h2 className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Notre Expertise</h2>
-                        <h3 className="text-3xl md:text-4xl font-serif font-bold text-gray-900">Centres d'Excellence</h3>
+                        <h3 className="text-3xl md:text-4xl font-serif font-bold text-gray-900">Nos Spécialités</h3>
                         <div className="w-20 h-1 bg-accent mx-auto mt-4"></div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {specialties.map((spec, idx) => (
-                            <div key={idx} className="flex gap-4 p-6 border border-gray-100 rounded-lg hover:border-gray-300 hover:bg-slate-50 transition-colors cursor-pointer group">
-                                <spec.icon className="text-primary mt-1 group-hover:scale-110 transition-transform" size={40} />
-                                <div>
-                                    <h4 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors">{spec.title}</h4>
-                                    <p className="text-gray-600 leading-relaxed">{spec.desc}</p>
-                                    <div className="mt-4 flex items-center text-sm font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                        En savoir plus <ArrowRight size={16} className="ml-1" />
+                            <Link key={idx} to={spec.link}>
+                                <div className="flex gap-4 p-6 border border-gray-100 rounded-lg hover:border-gray-300 hover:bg-slate-50 transition-colors cursor-pointer group h-full">
+                                    <spec.icon className="text-primary mt-1 group-hover:scale-110 transition-transform" size={40} />
+                                    <div>
+                                        <h4 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors">{spec.title}</h4>
+                                        <p className="text-gray-600 leading-relaxed">{spec.desc}</p>
+                                        <div className="mt-4 flex items-center text-sm font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                            En savoir plus <ArrowRight size={16} className="ml-1" />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </Link>
                         ))}
                         {/* More Link */}
-                        <div className="flex flex-col justify-center items-center p-6 border-2 border-dashed border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer text-gray-400 hover:text-primary">
+                        <Link to="/find-doctor" className="flex flex-col justify-center items-center p-6 border-2 border-dashed border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer text-gray-400 hover:text-primary">
                             <div className="text-lg font-semibold">Voir Toutes les Spécialités</div>
                             <ArrowRight size={24} className="mt-2" />
-                        </div>
+                        </Link>
                     </div>
                 </div>
             </section>
@@ -173,35 +175,33 @@ const LandingPage = () => {
             <footer className="bg-slate-900 text-slate-400 py-12 text-sm">
                 <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
                     <div>
-                        <div className="text-white text-lg font-bold mb-4 flex items-center gap-2"><span>🏥</span> GlucoCare</div>
-                        <p>Providing world-class diabetes care and research for our community.</p>
+                        <div className="text-white text-lg font-bold mb-4 flex items-center gap-2"><span>🏥</span> GlucoSoin</div>
+                        <p>Notre mission : Rapprocher médecins et patients pour une meilleure prise en charge du diabète grâce à une technologie simple et humaine.</p>
                     </div>
                     <div>
                         <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Patients</h4>
                         <ul className="space-y-2">
-                            <li><Link to="/login" className="hover:text-white">MyChart Login</Link></li>
-                            <li><a href="#" className="hover:text-white">Pay a Bill</a></li>
-                            <li><a href="#" className="hover:text-white">Insurance</a></li>
-                            <li><a href="#" className="hover:text-white">Medical Records</a></li>
+                            <li><Link to="/login" className="hover:text-white">Portail Patient</Link></li>
+                            <li><Link to="/portal" className="hover:text-white">Payer une Facture</Link></li>
+                            <li><Link to="/login" className="hover:text-white">Dossiers Médicaux</Link></li>
                         </ul>
                     </div>
                     <div>
-                        <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Organization</h4>
+                        <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Organisation</h4>
                         <ul className="space-y-2">
-                            <li><a href="#" className="hover:text-white">About Us</a></li>
-                            <li><a href="#" className="hover:text-white">Careers</a></li>
-                            <li><a href="#" className="hover:text-white">Newsroom</a></li>
+                            <li><Link to="/about" className="hover:text-white">À Propos</Link></li>
+                            <li><a href="#" className="hover:text-white">Carrières</a></li>
                             <li><a href="#" className="hover:text-white">Contact</a></li>
                         </ul>
                     </div>
                     <div>
-                        <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Connect</h4>
-                        <p className="mb-2">1234 Medical Center Dr.<br />Seattle, WA 98104</p>
-                        <p>(206) 555-0100</p>
+                        <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Contact</h4>
+                        <p className="mb-2">Av. de la Médecine, Gombe<br />Kinshasa, RDC</p>
+                        <p>+243 81 000 0000</p>
                     </div>
                 </div>
                 <div className="container mx-auto px-4 mt-8 pt-8 border-t border-slate-800 text-center">
-                    &copy; 2024 GlucoCare Medical Center. All rights reserved.
+                    &copy; 2024 Centre Médical GlucoSoin. Tous droits réservés.
                 </div>
             </footer>
         </div>

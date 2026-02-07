@@ -8,7 +8,7 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState(null);
     const messagesEndRef = useRef(null);
-    const version = "v1.5"; // Deployment verification tag
+    const version = "v2.0"; // Messaging system v2.0 - Fixed bidirectional conversations
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,17 +27,28 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
             // Use props for IDs if available (important for Doctor ID 99 vs Auth ID)
             const myId = customSenderId || (currentUser?.publicId) || safeUser.uid;
 
-            const targetId = isSpecialist ? contactId : myId;
+            // Always pass contactId to get the conversation between these two participants
+            const targetId = contactId;
+
+            if (!targetId) {
+                setError('Invalid conversation - no contact ID provided');
+                setLoading(false);
+                return;
+            }
 
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages?contactId=${targetId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) throw new Error("Failed to fetch");
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || "Failed to fetch");
+            }
             const data = await res.json();
             setMessages(data);
             setLoading(false);
         } catch (err) {
             console.error("Error fetching messages", err);
+            setError(err.message || "Failed to load messages");
             setLoading(false);
         }
     };
@@ -58,7 +69,12 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
 
         const safeUser = auth.currentUser || currentUser;
         if (!safeUser) {
-            setError("Session expiré. Rechargez la page.");
+            setError("Session expiée. Rechargez la page.");
+            return;
+        }
+
+        if (!contactId) {
+            setError("Invalid conversation - no contact ID provided");
             return;
         }
 
@@ -70,8 +86,13 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
 
             const myId = customSenderId || (currentUser?.publicId) || safeUser.uid;
             const senderId = myId;
-            const receiverId = contactId || 'SPECIALIST';
-            const senderName = customSenderName || (isSpecialist ? (currentUser?.displayName || 'Dr. Specialist') : (safeUser.email));
+            const receiverId = contactId;
+            const senderName = customSenderName || (isSpecialist ? (currentUser?.displayName || 'Dr. Specialist') : (safeUser.displayName || safeUser.email));
+
+            // Validate before sending
+            if (!senderId || !receiverId) {
+                throw new Error("Invalid sender or receiver ID");
+            }
 
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages`, {
                 method: 'POST',
@@ -88,12 +109,13 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
             });
 
             if (!res.ok) {
-                const errText = await res.text();
-                throw new Error(`${res.status} ${res.statusText}`);
+                const errorData = await res.json();
+                throw new Error(errorData.message || errorData.error || `${res.status} ${res.statusText}`);
             }
 
             setNewMessage('');
-            fetchMessages();
+            // Refresh messages immediately after sending
+            setTimeout(fetchMessages, 300);
         } catch (err) {
             console.error("Error sending message", err);
             setError(`Erreur: ${err.message}`);

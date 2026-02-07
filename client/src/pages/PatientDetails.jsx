@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 const PatientDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     const [patient, setPatient] = useState(null);
     const [vitals, setVitals] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -29,34 +30,39 @@ const PatientDetails = () => {
     const [documents, setDocuments] = useState([]);
     const [uploading, setUploading] = useState(false);
 
-    const fetchData = () => {
-        Promise.all([
-            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/appointments`).then(res => res.json()),
-            fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`).then(res => res.json())
-        ])
-            .then(([patientData, vitalsData, prescriptionsData, appointmentsData, documentsData]) => {
-                setPatient(patientData);
-                setPhone(patientData.phone || '');
-                setVitals(vitalsData);
-                setPrescriptions(prescriptionsData);
-                const patientApps = appointmentsData.filter(a => String(a.patientId) === String(id));
-                setAppointments(patientApps);
-                // Ensure documentsData is an array if API returns error or empty
-                setDocuments(Array.isArray(documentsData) ? documentsData : []);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("Error fetching data", err);
-                setLoading(false);
-            });
+    const fetchData = async () => {
+        if (!currentUser) return;
+        try {
+            const token = await currentUser.getIdToken();
+            const headers = { 'Authorization': `Bearer ${token}` };
+
+            const [patientData, vitalsData, prescriptionsData, appointmentsData, documentsData] = await Promise.all([
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/appointments`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`, { headers }).then(res => res.json())
+            ]);
+
+            setPatient(patientData);
+            setPhone(patientData.phone || '');
+            setVitals(vitalsData);
+            setPrescriptions(prescriptionsData);
+            const patientApps = appointmentsData.filter(a => String(a.patientId) === String(id));
+            setAppointments(patientApps);
+            setDocuments(Array.isArray(documentsData) ? documentsData : []);
+            setLoading(false);
+        } catch (err) {
+            console.error("Error fetching data", err);
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
-        fetchData();
-    }, [id]);
+        if (currentUser) {
+            fetchData();
+        }
+    }, [id, currentUser]);
 
     const handleAddVital = async (e) => {
         e.preventDefault();
@@ -95,9 +101,10 @@ const PatientDetails = () => {
         const newVital = { ...baseVital, ...specificData };
 
         try {
+            const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(newVital),
             });
 
@@ -126,9 +133,10 @@ const PatientDetails = () => {
         };
 
         try {
+            const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(newPrescription),
             });
 
@@ -144,11 +152,62 @@ const PatientDetails = () => {
         }
     };
 
+    const handleUploadDocument = async (e) => {
+        e.preventDefault();
+        setUploading(true);
+        const formData = new FormData(e.target);
+        const file = formData.get('file');
+        const type = formData.get('type');
+
+        if (!file) {
+            alert("Veuillez sélectionner un fichier.");
+            setUploading(false);
+            return;
+        }
+
+        try {
+            // 1. Upload to Firebase Storage
+            const storageRef = ref(storage, `patients/${id}/documents/${Date.now()}_${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+
+            // 2. Save Metadata to API
+            const newDoc = {
+                name: file.name,
+                type: type,
+                url: downloadURL,
+                date: new Date().toISOString().split('T')[0],
+                size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+            };
+
+            const token = await currentUser.getIdToken();
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(newDoc),
+            });
+
+            if (response.ok) {
+                fetchData();
+                e.target.reset();
+                alert("Document ajouté avec succès !");
+            } else {
+                alert("Erreur lors de l'enregistrement du document.");
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Erreur lors de l'upload.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleUpdatePhone = async () => {
         try {
+            const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ phone }),
             });
 
@@ -166,9 +225,10 @@ const PatientDetails = () => {
 
     const handleSaveNote = async (appointmentId) => {
         try {
+            const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/appointments/${appointmentId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ notes: noteText }),
             });
 

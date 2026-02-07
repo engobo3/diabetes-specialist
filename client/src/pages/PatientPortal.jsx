@@ -1,18 +1,24 @@
 import ChatInterface from '../components/ChatInterface';
 import AiAssistant from '../components/AiAssistant';
+import PatientSelector from '../components/PatientSelector';
+import HealthInsightsPanel from '../components/HealthInsightsPanel';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus } from 'lucide-react';
+import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus, Users, Brain } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import BetaBadge from '../components/ui/BetaBadge';
 import Input from '../components/ui/Input';
 import Skeleton from '../components/ui/Skeleton';
 import PaymentForm from '../components/PaymentForm';
+import CaregiverInviteForm from '../components/CaregiverInviteForm';
+import CaregiverList from '../components/CaregiverList';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 const PatientPortal = () => {
-    const { patientId, logout, currentUser } = useAuth();
+    const { patientId, logout, currentUser, userRole, managedPatients } = useAuth();
     const [patient, setPatient] = useState(null);
     const [vitals, setVitals] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -134,19 +140,22 @@ const PatientPortal = () => {
 
     const navItems = [
         { id: 'overview', label: "Vue d'ensemble", icon: Activity },
+        { id: 'ai-insights', label: "Analyse IA", icon: Brain },
         { id: 'appointments', label: "Rendez-vous", icon: Calendar },
         { id: 'prescriptions', label: "Ordonnances", icon: FileText },
         { id: 'payments', label: "Paiements", icon: Banknote },
         { id: 'messages', label: "Messagerie", icon: MessageSquare },
+        { id: 'caregivers', label: "Aidants", icon: Users },
     ];
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
             <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="container flex items-center justify-between h-16">
+                <div className="container flex items-center justify-between h-16 gap-4">
                     <div className="text-xl font-bold text-primary flex items-center gap-2">
-                        <Activity className="text-primary" size={24} /> GlucoCare <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Espace Patient</span>
+                        <Activity className="text-primary" size={24} /> GlucoCare <BetaBadge /> <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Espace Patient</span>
                     </div>
+                    <RoleSwitcher />
                     <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-red-500 gap-2">
                         <LogOut size={16} /> <span className="hidden sm:inline">Déconnexion</span>
                     </Button>
@@ -324,6 +333,15 @@ const PatientPortal = () => {
                     </div>
                 )}
 
+                {activeTab === 'ai-insights' && (
+                    <HealthInsightsPanel
+                        patientData={patient}
+                        vitals={vitals}
+                        prescriptions={prescriptions}
+                        currentUser={currentUser}
+                    />
+                )}
+
                 {activeTab === 'appointments' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <AppointmentList patientId={patientId} currentUser={currentUser} />
@@ -400,6 +418,25 @@ const PatientPortal = () => {
                                 />
                             </div>
                         </Card>
+                    </div>
+                )}
+
+                {activeTab === 'caregivers' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <CaregiverInviteForm
+                            patientId={patientId}
+                            onSuccess={() => {
+                                // Refresh caregiver list
+                                window.location.reload();
+                            }}
+                        />
+                        <CaregiverList
+                            patientId={patientId}
+                            onUpdate={() => {
+                                // Refresh data
+                                window.location.reload();
+                            }}
+                        />
                     </div>
                 )}
             </main>

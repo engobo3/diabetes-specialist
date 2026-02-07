@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ChatInterface from '../components/ChatInterface';
 import { useAuth } from '../context/AuthContext';
 import { Mail } from 'lucide-react';
+import BetaBadge from '../components/ui/BetaBadge';
 
 const DoctorMessaging = () => {
     const { currentUser, doctorProfile } = useAuth();
@@ -10,26 +11,32 @@ const DoctorMessaging = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!doctorProfile?.id) return;
-
-        fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`)
-            .then(res => res.json())
-            .then(data => {
-                setPatients(data);
-                setLoading(false);
-            })
-            .catch(err => {
+        const fetchPatients = async () => {
+            if (!doctorProfile?.id || !currentUser) return;
+            try {
+                const token = await currentUser.getIdToken();
+                const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setPatients(data);
+                }
+            } catch (err) {
                 console.error("Failed to fetch patients", err);
+            } finally {
                 setLoading(false);
-            });
-    }, []);
+            }
+        };
+        fetchPatients();
+    }, [doctorProfile, currentUser]);
 
     return (
         <div className="min-h-screen bg-white">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 h-16 flex items-center px-6">
                 <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Mail className="w-5 h-5" /> Messagerie
+                    <Mail className="w-5 h-5" /> Messagerie <BetaBadge />
                 </h1>
             </div>
 

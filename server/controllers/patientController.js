@@ -1,4 +1,5 @@
 const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, createPatient, updatePatient, deletePatient, migrateToFirestore, getVitals, addVital, getPatientDocuments, addPatientDocument } = require('../services/database');
+const { validatePatient } = require('../utils/validation');
 
 const getAllPatients = async (req, res) => {
     try {
@@ -60,6 +61,28 @@ const getPatientByEmailController = async (req, res) => {
     }
 };
 
+const getCaregiverPatientsController = async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ message: 'Email required' });
+
+        // Fetch all patients
+        const allPatients = await getPatients();
+        
+        // Filter for patients where this email is a caregiver
+        const managedPatients = allPatients.filter(patient => {
+            return patient.caregivers && 
+                   Array.isArray(patient.caregivers) &&
+                   patient.caregivers.some(cg => cg.email === email);
+        });
+
+        res.json(managedPatients);
+    } catch (error) {
+        console.error("Caregiver Lookup Error:", error);
+        res.status(500).json({ message: 'Error looking up caregiver patients' });
+    }
+};
+
 const getPatientVitals = async (req, res) => {
     try {
         const vitals = await getVitals(req.params.id);
@@ -80,6 +103,11 @@ const addPatientVital = async (req, res) => {
 
 const createNewPatient = async (req, res) => {
     try {
+        const { isValid, error } = validatePatient(req.body);
+        if (!isValid) {
+            return res.status(400).json({ message: error });
+        }
+
         const newPatient = await createPatient(req.body);
         res.status(201).json(newPatient);
     } catch (error) {
@@ -89,10 +117,32 @@ const createNewPatient = async (req, res) => {
 
 const updateExistingPatient = async (req, res) => {
     try {
-        const updatedPatient = await updatePatient(req.params.id, req.body);
-        if (!updatedPatient) {
+        // For updates, we might only validate provided fields, but for strictness we'll validate the merged object if possible.
+        // Or simply validate the body if we expect a full update. 
+        // Assuming partial updates (PATCH) logic, validation might need to be partial.
+        // However, user asked for schema enforcement. Let's validate the incoming body as a full or partial object.
+        // Note: For partial updates, validatePatient might fail if required fields are missing.
+        // Let's assume for now updates must provide valid data for the fields they are updating.
+        // Better approach: Merge with existing patient then validate? 
+        // For simplicity and safety against bad data:
+        // We will validate the fields present in req.body if they are part of the schema.
+
+        // Actually, easiest way to enforce schema on update is to check if the update creates an invalid state.
+        // Let's first fetch the patient, merge, validate, then save.
+
+        const existingPatient = await getPatientById(req.params.id);
+        if (!existingPatient) {
             return res.status(404).json({ message: 'Patient not found' });
         }
+
+        const mergedPatient = { ...existingPatient, ...req.body };
+        const { isValid, error } = validatePatient(mergedPatient);
+
+        if (!isValid) {
+            return res.status(400).json({ message: error });
+        }
+
+        const updatedPatient = await updatePatient(req.params.id, req.body);
         res.status(200).json(updatedPatient);
     } catch (error) {
         res.status(500).json({ message: 'Error updating patient' });
@@ -131,6 +181,7 @@ module.exports = {
     getPatients: getAllPatients,
     getPatientById: getPatient,
     getPatientByEmail: getPatientByEmailController,
+    getCaregiverPatients: getCaregiverPatientsController,
     getPatientVitals,
     addPatientVital,
     createPatient: createNewPatient,

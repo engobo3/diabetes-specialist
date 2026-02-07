@@ -7,16 +7,19 @@
     "type": "Type 2",
     "lastVisit": "2025-12-15",
     "status": "Stable",
-    "doctorId": 1
+    "doctorId": 1,
+    "caregivers": []
   },
   {
     "id": 2,
     "name": "John Smith",
+    "email": "john@example.com",
     "age": 32,
     "type": "Type 1",
     "lastVisit": "2025-12-28",
     "status": "Attention Needed",
-    "doctorId": 1
+    "doctorId": 1,
+    "caregivers": []
   },
   {
     "id": 3,
@@ -25,7 +28,10 @@
     "type": "Type 2",
     "lastVisit": "2026-01-02",
     "status": "Critical",
-    "doctorId": 2
+    "doctorId": 2,
+    "caregivers": [
+      { "email": "adult.child@example.com", "relationship": "adult_child" }
+    ]
   },
   {
     "id": 7,
@@ -34,7 +40,8 @@
     "type": "Type 1",
     "status": "Stable",
     "lastVisit": "2026-01-06",
-    "doctorId": 1
+    "doctorId": 1,
+    "caregivers": []
   },
   {
     "id": 101,
@@ -45,7 +52,8 @@
     "status": "Stable",
     "doctorId": 99,
     "email": "alpha@demo.com",
-    "phone": "0990000001"
+    "phone": "0990000001",
+    "caregivers": []
   },
   {
     "id": 102,
@@ -56,7 +64,8 @@
     "status": "Attention Needed",
     "doctorId": 99,
     "email": "beta@demo.com",
-    "phone": "0990000002"
+    "phone": "0990000002",
+    "caregivers": []
   },
   {
     "id": 103,
@@ -67,6 +76,7 @@
     "status": "Critical",
     "doctorId": 99,
     "email": "gamma@demo.com",
-    "phone": "0990000003"
+    "phone": "0990000003",
+    "caregivers": []
   }
 ]

@@ -188,8 +188,17 @@ const FindDoctor = () => {
 
                             {filteredDoctors.length === 0 && (
                                 <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
-                                    <p className="text-gray-500 text-lg">Aucun médecin trouvé correspondant à vos critères.</p>
-                                    <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedSpecialty(''); }}>Effacer les Filtres</Button>
+                                    {selectedSpecialty ? (
+                                        <>
+                                            <p className="text-gray-900 font-bold text-xl mb-2">Lancement prochainement</p>
+                                            <p className="text-gray-500">Nous travaillons activement pour ajouter des spécialistes en <span className="font-semibold text-primary">{selectedSpecialty}</span> à notre réseau.</p>
+                                        </>
+                                    ) : (
+                                        <p className="text-gray-500 text-lg">Aucun médecin trouvé correspondant à vos critères.</p>
+                                    )}
+                                    <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedSpecialty(''); }} className="mt-4">
+                                        Effacer les Filtres
+                                    </Button>
                                 </div>
                             )}
                         </div>
