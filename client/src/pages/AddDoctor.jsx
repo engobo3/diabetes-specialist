@@ -24,6 +24,7 @@ const AddDoctor = () => {
         email: '',
         phone: '',
         address: '',
+        city: '',
         languages: '',
         image: 'https://randomuser.me/api/portraits/lego/1.jpg' // Default placeholder
     });
@@ -39,12 +40,19 @@ const AddDoctor = () => {
                 },
                 body: JSON.stringify(newDoctor)
             });
-            if (!response.ok) throw new Error('Failed to add doctor');
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to add doctor');
+            }
             return response.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['doctors'] }); // Invalidate cache if we had one
             navigate('/find-doctor');
+        },
+        onError: (error) => {
+            console.error('Error adding doctor:', error);
+            alert(`Erreur: ${error.message}`);
         }
     });
 
@@ -78,6 +86,7 @@ const AddDoctor = () => {
             ...formData,
             education: formData.education.split(',').map(s => s.trim()).filter(Boolean),
             languages: formData.languages.split(',').map(s => s.trim()).filter(Boolean),
+            city: formData.city || 'Kinshasa', // Default to Kinshasa if not provided
             contact: {
                 email: formData.email,
                 phone: formData.phone,
@@ -104,6 +113,11 @@ const AddDoctor = () => {
 
                     <Card>
                         <CardContent className="p-8">
+                            {addDoctorMutation.isError && (
+                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
+                                    <strong>Erreur:</strong> {addDoctorMutation.error?.message || 'Une erreur est survenue'}
+                                </div>
+                            )}
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <Input label="Nom Complet (ex. Dr. Jean Dupont)" name="name" value={formData.name} onChange={handleChange} required />
                                 <Input label="Spécialité" name="specialty" value={formData.specialty} onChange={handleChange} required placeholder="ex. Cardiologue" />
@@ -124,7 +138,10 @@ const AddDoctor = () => {
                                     <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} required />
                                     <Input label="Téléphone" name="phone" value={formData.phone} onChange={handleChange} required />
                                 </div>
-                                <Input label="Adresse du Cabinet" name="address" value={formData.address} onChange={handleChange} required />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Input label="Adresse du Cabinet" name="address" value={formData.address} onChange={handleChange} required />
+                                    <Input label="Ville" name="city" value={formData.city} onChange={handleChange} required placeholder="ex. Kinshasa, Lubumbashi" />
+                                </div>
 
                                 <Input label="Formation (séparée par des virgules)" name="education" value={formData.education} onChange={handleChange} placeholder="MD Kinshasa, Résidence Mama Yemo" />
                                 <Input label="Langues (séparées par des virgules)" name="languages" value={formData.languages} onChange={handleChange} placeholder="Français, Lingala, Swahili" />
