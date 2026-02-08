@@ -36,7 +36,9 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
                 return;
             }
 
-            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages?contactId=${targetId}`, {
+            // Pass senderId when using custom ID (doctor app ID vs Firebase UID)
+            const senderParam = myId !== safeUser.uid ? `&senderId=${myId}` : '';
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages?contactId=${targetId}${senderParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) {

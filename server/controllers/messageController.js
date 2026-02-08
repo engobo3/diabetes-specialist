@@ -16,13 +16,16 @@ const getConversationMessages = async (req, res) => {
         }
 
         // Get current user from authenticated request
-        const userId = req.user?.uid;
-        if (!userId) {
-            return res.status(401).json({ 
+        const uid = req.user?.uid;
+        if (!uid) {
+            return res.status(401).json({
                 error: 'Unauthorized',
-                message: 'User authentication required' 
+                message: 'User authentication required'
             });
         }
+
+        // Use senderId from query if provided (for doctors using app ID instead of Firebase UID)
+        const userId = req.query.senderId || uid;
 
         // Use new conversation method for proper bidirectional filtering
         const messages = await getConversation(userId, contactId);

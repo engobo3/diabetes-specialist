@@ -30,6 +30,7 @@ const AddPatient = () => {
             const token = await currentUser.getIdToken();
             const payload = {
                 ...formData,
+                age: parseInt(formData.age, 10),
                 doctorId: doctorProfile?.id,
                 doctorName: doctorProfile?.name
             };
@@ -46,7 +47,8 @@ const AddPatient = () => {
             if (response.ok) {
                 navigate('/dashboard');
             } else {
-                console.error("Failed to create patient");
+                const errData = await response.json();
+                alert(`Erreur: ${errData.message || 'Impossible de créer le patient'}`);
             }
         } catch (error) {
             console.error("Error creating patient", error);

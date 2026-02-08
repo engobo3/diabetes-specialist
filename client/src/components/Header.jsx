@@ -7,7 +7,7 @@ import RoleSwitcher from './RoleSwitcher';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
-    const { currentUser, userRoles } = useAuth();
+    const { currentUser, userRoles, activeRole } = useAuth();
 
     return (
         <header className="w-full font-sans">
@@ -77,9 +77,9 @@ const Header = () => {
                     <div className="hidden lg:flex items-center gap-3">
                         {currentUser && userRoles && userRoles.length > 1 && <RoleSwitcher />}
 
-                        {/* Primary Action (MyChart) */}
+                        {/* Primary Action - routes based on role */}
                         {currentUser ? (
-                            <Link to="/portal">
+                            <Link to={activeRole === 'patient' || activeRole === 'caregiver' ? '/portal' : '/dashboard'}>
                                 <Button className="bg-blue-900 hover:bg-blue-800 text-white border-none shadow-none rounded-full px-6 flex items-center gap-2">
                                     <User size={16} /> Mon Espace
                                 </Button>
