@@ -4,8 +4,8 @@ import PatientSelector from '../components/PatientSelector';
 import HealthInsightsPanel from '../components/HealthInsightsPanel';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus, Users, Brain } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
+import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus, Users, Brain, ClipboardList, Footprints } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -16,6 +16,8 @@ import PaymentForm from '../components/PaymentForm';
 import CaregiverInviteForm from '../components/CaregiverInviteForm';
 import CaregiverList from '../components/CaregiverList';
 import RoleSwitcher from '../components/RoleSwitcher';
+import MedicalDossier from '../components/MedicalDossier';
+import FootRiskSummaryCard from '../components/FootRiskSummaryCard';
 
 const PatientPortal = () => {
     const { patientId, logout, currentUser, userRole, managedPatients } = useAuth();
@@ -28,6 +30,9 @@ const PatientPortal = () => {
     const [forecast, setForecast] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [isAddVitalOpen, setIsAddVitalOpen] = useState(false);
+    const [medicalRecords, setMedicalRecords] = useState([]);
+    const [documents, setDocuments] = useState([]);
+    const [dossierAppointments, setDossierAppointments] = useState([]);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -42,15 +47,22 @@ const PatientPortal = () => {
                 const token = await currentUser.getIdToken();
                 const headers = { 'Authorization': `Bearer ${token}` };
 
-                const [patientRes, vitalsRes, prescriptionsRes] = await Promise.all([
+                const [patientRes, vitalsRes, prescriptionsRes, medicalRecordsRes, documentsRes, appointmentsRes] = await Promise.all([
                     fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}`, { headers }).then(res => res.json()),
                     fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/vitals`, { headers }).then(res => res.json()),
-                    fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${patientId}`, { headers }).then(res => res.json())
+                    fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${patientId}`, { headers }).then(res => res.json()),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/medical-records/patient/${patientId}`, { headers }).then(res => res.ok ? res.json() : []),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/documents`, { headers }).then(res => res.ok ? res.json() : []),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/appointments`, { headers }).then(res => res.ok ? res.json() : [])
                 ]);
 
                 setPatient(patientRes);
                 setVitals(vitalsRes);
                 setPrescriptions(prescriptionsRes);
+                setMedicalRecords(Array.isArray(medicalRecordsRes) ? medicalRecordsRes : []);
+                setDocuments(Array.isArray(documentsRes) ? documentsRes : []);
+                const patientApps = (Array.isArray(appointmentsRes) ? appointmentsRes : []).filter(a => String(a.patientId) === String(patientId));
+                setDossierAppointments(patientApps);
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching data", err);
@@ -82,9 +94,17 @@ const PatientPortal = () => {
         </div>
     );
 
-    // Filter vitals for chart (reuse logic from PatientDetails)
+    // Filter vitals for chart - use category first, fall back to type field
     const filteredVitals = vitals?.readings
-        ?.filter(v => (v.category === selectedVitalType) || (!v.category && selectedVitalType === 'Glucose'))
+        ?.filter(v => {
+            const vitalType = v.category || v.type;
+            return vitalType === selectedVitalType || (!vitalType && selectedVitalType === 'Glucose');
+        })
+        ?.map(v => ({
+            ...v,
+            // Normalize glucose field so chart dataKey always finds a value
+            glucose: v.glucose ?? (selectedVitalType === 'Glucose' ? (typeof v.value === 'number' ? v.value : parseFloat(v.value)) : undefined),
+        }))
         ?.sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
 
     const chartData = forecast ? [...filteredVitals, ...forecast.predictions] : [...filteredVitals];
@@ -138,19 +158,29 @@ const PatientPortal = () => {
     const config = getVitalConfig(selectedVitalType);
     const Icon = config.icon;
 
+    const recordTypeLabels = {
+        diagnosis: 'Diagnostic',
+        lab_result: 'Resultat Labo',
+        procedure: 'Procedure',
+        clinical_note: 'Note Clinique',
+        referral: 'Orientation'
+    };
+
     const navItems = [
         { id: 'overview', label: "Vue d'ensemble", icon: Activity },
         { id: 'ai-insights', label: "Analyse IA", icon: Brain },
         { id: 'appointments', label: "Rendez-vous", icon: Calendar },
         { id: 'prescriptions', label: "Ordonnances", icon: FileText },
+        { id: 'medical-records', label: "Dossier Medical", icon: ClipboardList },
         { id: 'payments', label: "Paiements", icon: Banknote },
         { id: 'messages', label: "Messagerie", icon: MessageSquare },
+        { id: 'foot-risk', label: "Risque Podologique", icon: Footprints },
         { id: 'caregivers', label: "Aidants", icon: Users },
     ];
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
-            <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
+            <nav className="bg-white border-b border-gray-200 sticky top-0 z-10 print:hidden">
                 <div className="container flex items-center justify-between h-16 gap-4">
                     <div className="text-xl font-bold text-primary flex items-center gap-2">
                         <Activity className="text-primary" size={24} /> GlucoCare <BetaBadge /> <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Espace Patient</span>
@@ -162,12 +192,12 @@ const PatientPortal = () => {
                 </div>
             </nav>
 
-            <main className="container py-8 space-y-8">
-                <Card className="bg-gradient-to-r from-primary/5 to-white border-primary/10">
+            <main className="container py-4 sm:py-8 px-3 sm:px-4 space-y-6 sm:space-y-8">
+                <Card className="bg-gradient-to-r from-primary/5 to-white border-primary/10 print:hidden">
                     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex-1">
                             <h1 className="text-2xl font-bold text-gray-900">Bonjour, {patient.name}</h1>
-                            <div className="flex items-center gap-4 mt-2">
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2">
                                 <p className="text-gray-500 text-sm flex items-center gap-2">
                                     <Clock size={14} /> Dernière visite: {patient.lastVisit}
                                 </p>
@@ -193,7 +223,7 @@ const PatientPortal = () => {
                                 variant="outline"
                                 size="sm"
                                 className="hidden sm:flex"
-                                onClick={() => setAddVitalOpen(true)}
+                                onClick={() => setIsAddVitalOpen(true)}
                             >
                                 <Plus size={16} className="mr-2" /> Ajouter Mesure
                             </Button>
@@ -209,18 +239,19 @@ const PatientPortal = () => {
                 </Card>
 
                 {/* Main Navigation Tabs */}
-                <div className="flex border-b border-gray-200 overflow-x-auto pb-1 gap-4">
+                <div className="flex border-b border-gray-200 overflow-x-auto pb-1 gap-1 sm:gap-4 print:hidden">
                     {navItems.map(item => (
                         <button
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
-                            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === item.id
+                            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap min-h-[44px] ${activeTab === item.id
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
-                            <item.icon size={18} />
-                            {item.label}
+                            <item.icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                            <span className="hidden sm:inline">{item.label}</span>
+                            <span className="sm:hidden">{item.label.split(' ')[0]}</span>
                         </button>
                     ))}
                 </div>
@@ -286,21 +317,27 @@ const PatientPortal = () => {
                                     </div>
                                 )}
 
-                                <div className="h-80 w-full">
+                                <div className="h-64 sm:h-96 w-full">
                                     {chartData.length > 0 ? (
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={chartData}>
+                                            <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 10 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} dy={10} />
-                                                <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} dx={-10} />
+                                                <YAxis tick={{ fontSize: 12, fill: '#6B7280', fontWeight: 500 }} tickLine={false} axisLine={false} dx={-10} domain={['auto', 'auto']} />
                                                 <Tooltip
                                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }}
                                                     cursor={{ stroke: config.color, strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                    formatter={(value, name) => [`${value} ${config.unit}`, name === 'systolic' ? 'Systolique' : name === 'diastolic' ? 'Diastolique' : selectedVitalType]}
                                                 />
                                                 {selectedVitalType === 'Blood Pressure' ? (
                                                     <>
-                                                        <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={3} dot={{ r: 4, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
-                                                        <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={3} dot={{ r: 4, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                                                        <Legend verticalAlign="top" height={36} formatter={(value) => value === 'systolic' ? 'Systolique' : 'Diastolique'} />
+                                                        <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={3} dot={{ r: 5, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="systolic">
+                                                            <LabelList dataKey="systolic" position="top" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: config.color }} />
+                                                        </Line>
+                                                        <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={3} dot={{ r: 5, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="diastolic">
+                                                            <LabelList dataKey="diastolic" position="bottom" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: '#818CF8' }} />
+                                                        </Line>
                                                     </>
                                                 ) : (
                                                     <Line
@@ -311,13 +348,15 @@ const PatientPortal = () => {
                                                         dot={(props) => {
                                                             const { cx, cy, payload } = props;
                                                             if (payload.type === 'predicted') {
-                                                                return <circle cx={cx} cy={cy} r={4} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
+                                                                return <circle cx={cx} cy={cy} r={5} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
                                                             }
-                                                            return <circle cx={cx} cy={cy} r={4} fill={config.color} stroke="white" strokeWidth={2} />;
+                                                            return <circle cx={cx} cy={cy} r={5} fill={config.color} stroke="white" strokeWidth={2} />;
                                                         }}
-                                                        activeDot={{ r: 6 }}
+                                                        activeDot={{ r: 7 }}
                                                         strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
-                                                    />
+                                                    >
+                                                        <LabelList dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'} position="top" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: config.color }} />
+                                                    </Line>
                                                 )}
                                             </LineChart>
                                         </ResponsiveContainer>
@@ -343,7 +382,7 @@ const PatientPortal = () => {
                 )}
 
                 {activeTab === 'appointments' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
                         <AppointmentList patientId={patientId} currentUser={currentUser} />
                         <AppointmentRequestForm patientId={patientId} patientName={patient.name} doctorId={patient.doctorId} currentUser={currentUser} />
                     </div>
@@ -386,6 +425,21 @@ const PatientPortal = () => {
                     </Card>
                 )}
 
+                {activeTab === 'medical-records' && (
+                    <MedicalDossier
+                        patient={patient}
+                        vitals={vitals?.readings || []}
+                        prescriptions={prescriptions}
+                        medicalRecords={medicalRecords}
+                        documents={documents}
+                        appointments={dossierAppointments}
+                    />
+                )}
+
+                {activeTab === 'foot-risk' && (
+                    <FootRiskSummaryCard patientId={patientId} />
+                )}
+
                 {activeTab === 'payments' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div className="space-y-6">
@@ -405,7 +459,7 @@ const PatientPortal = () => {
 
 
                 {activeTab === 'messages' && (
-                    <div className="max-w-3xl mx-auto h-[600px]">
+                    <div className="max-w-3xl mx-auto h-[calc(100vh-200px)] sm:h-[600px]">
                         <Card className="h-full flex flex-col">
                             <CardHeader>
                                 <CardTitle>Messagerie Sécurisée</CardTitle>
@@ -442,7 +496,7 @@ const PatientPortal = () => {
             </main>
 
             {/* AI Assistant */}
-            <AiAssistant />
+            <AiAssistant patient={patient} vitals={vitals} prescriptions={prescriptions} />
 
             {isAddVitalOpen && (
                 <AddVitalForm
@@ -504,7 +558,7 @@ const AppointmentRequestForm = ({ patientId, patientName, doctorId, currentUser 
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-gray-700">Date souhaitée</label>
                             <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
@@ -597,14 +651,14 @@ const AppointmentList = ({ patientId, currentUser }) => {
                 ) : (
                     <div className="space-y-3">
                         {appointments.map(apt => (
-                            <div key={apt.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:border-primary/30 transition-colors">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-white p-2 rounded-md border border-gray-100 text-center min-w-[60px]">
+                            <div key={apt.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100 hover:border-primary/30 transition-colors">
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                    <div className="bg-white p-2 rounded-md border border-gray-100 text-center min-w-[50px] sm:min-w-[60px]">
                                         <div className="text-xs text-gray-500 font-bold uppercase">{new Date(apt.date).toLocaleString('default', { month: 'short' })}</div>
-                                        <div className="text-xl font-bold text-gray-900">{new Date(apt.date).getDate()}</div>
+                                        <div className="text-lg sm:text-xl font-bold text-gray-900">{new Date(apt.date).getDate()}</div>
                                     </div>
                                     <div>
-                                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                                        <div className="font-semibold text-gray-900 flex flex-wrap items-center gap-1 sm:gap-2">
                                             {apt.time}
                                             <span className="text-gray-400 font-normal text-sm">•</span>
                                             <span className="text-gray-600 font-normal text-sm">{apt.reason}</span>
@@ -637,11 +691,12 @@ const PaymentHistoryList = ({ patientId, currentUser }) => {
         const fetchPayments = async () => {
             try {
                 const token = await currentUser.getIdToken();
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/${patientId}`, {
+                const apiUrl = import.meta.env.VITE_API_URL || '';
+                const res = await fetch(`${apiUrl}/api/payments/patient/${patientId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await res.json();
-                setPayments(data);
+                const json = await res.json();
+                setPayments(json.data?.transactions || []);
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching payments", err);
@@ -674,9 +729,12 @@ const PaymentHistoryList = ({ patientId, currentUser }) => {
                             <div key={pay.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                                 <div>
                                     <div className="font-bold text-gray-900">{pay.amount} {pay.currency}</div>
-                                    <div className="text-xs text-gray-500">{new Date(pay.date).toLocaleDateString()} • {pay.method}</div>
+                                    <div className="text-xs text-gray-500">{new Date(pay.createdAt).toLocaleDateString()} • {pay.paymentMethod || 'cash'}</div>
+                                    {pay.description && <div className="text-xs text-gray-400">{pay.description}</div>}
                                 </div>
-                                <Badge variant="success">Validé</Badge>
+                                <Badge variant={pay.status === 'completed' ? 'success' : 'warning'}>
+                                    {pay.status === 'completed' ? 'Validé' : pay.status === 'pending' ? 'En attente' : pay.status}
+                                </Badge>
                             </div>
                         ))}
                     </div>
@@ -711,7 +769,8 @@ const AddVitalForm = ({ patientId, currentUser, onSuccess, onCancel, initialType
 
             // Construct payload based on type
             let payload = {
-                category: type,
+                type: type,
+                category: type, // Required for filtering vitals by type in both patient and doctor views
                 date: formData.date // Backend likely expects YYYY-MM-DD
             };
 
@@ -725,9 +784,10 @@ const AddVitalForm = ({ patientId, currentUser, onSuccess, onCancel, initialType
 
             if (type === 'Glucose') {
                 payload.subtype = formData.subtype;
+                payload.glucose = parseFloat(formData.value); // Store as 'glucose' field for chart dataKey
             }
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/vitals`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients/${patientId}/vitals`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

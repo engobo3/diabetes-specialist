@@ -6,11 +6,17 @@ const PatientSchema = z.object({
     email: z.string().email().optional().or(z.literal('')),
     phone: z.string().optional(),
     age: z.coerce.number().min(0).optional(),
-    type: z.enum(['Type 1', 'Type 2', 'Gestational', 'Pre-diabetes', 'Other']).optional(),
+    type: z.enum(['Type 1', 'Type 2', 'Gestational', 'Prediabetes', 'Other']).optional(),
     status: z.string().optional(),
     lastVisit: z.string().optional(), // ISO Date string
     doctorId: z.union([z.string(), z.number()]).optional(),
+    doctorIds: z.array(z.union([z.string(), z.number()])).optional(),
     uid: z.string().optional(), // Firebase Auth UID
+
+    // Activation code system
+    activationCode: z.string().length(6).nullable().optional(),
+    activationCodeExpiry: z.string().nullable().optional(),
+    activated: z.boolean().default(false).optional(),
 
     // Caregiver relationships
     caregivers: z.array(z.object({
@@ -34,6 +40,12 @@ const PatientSchema = z.object({
     doctorName: z.string().optional(),
     doctorPhoto: z.string().nullable().optional(),
     doctorSpecialty: z.string().optional(),
+    doctors: z.array(z.object({
+        id: z.union([z.string(), z.number()]),
+        name: z.string(),
+        photo: z.string().nullable().optional(),
+        specialty: z.string().optional(),
+    })).optional(),
 
     // Sub-collections or embedded arrays might be handled separately, 
     // but for simple validation of the main object:

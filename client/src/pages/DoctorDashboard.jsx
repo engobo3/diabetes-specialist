@@ -97,7 +97,7 @@ const DoctorDashboard = () => {
     };
 
     const handleViewPatient = (patientId) => {
-        navigate(`/patient/${patientId}`);
+        navigate(`/patients/${patientId}`);
     };
 
     const handleMessagePatient = (patientId) => {
@@ -117,11 +117,11 @@ const DoctorDashboard = () => {
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="container py-6">
+                <div className="container py-3 sm:py-6 px-3 sm:px-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Tableau de Bord</h1>
-                            <p className="text-gray-600 mt-1">Gestion de vos patients du diabète</p>
+                            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Tableau de Bord</h1>
+                            <p className="text-gray-600 mt-1 text-sm sm:text-base">Gestion de vos patients du diabète</p>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                             <Users size={20} />
@@ -131,17 +131,17 @@ const DoctorDashboard = () => {
                 </div>
             </header>
 
-            <main className="container py-8">
+            <main className="container py-4 sm:py-8 px-3 sm:px-4">
                 {/* Statistics Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-gray-600 font-medium">Total Patients</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+                                    <p className="text-xl sm:text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
                                 </div>
-                                <Users className="w-12 h-12 text-blue-100 rounded-full p-3 bg-blue-50" />
+                                <Users className="w-10 h-10 sm:w-12 sm:h-12 text-blue-100 rounded-full p-2 sm:p-3 bg-blue-50" />
                             </div>
                         </CardContent>
                     </Card>
@@ -151,9 +151,9 @@ const DoctorDashboard = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-red-600 font-medium">Cas Critiques</p>
-                                    <p className="text-3xl font-bold text-red-600 mt-2">{stats.critical}</p>
+                                    <p className="text-xl sm:text-3xl font-bold text-red-600 mt-2">{stats.critical}</p>
                                 </div>
-                                <AlertCircle className="w-12 h-12 text-red-100 rounded-full p-3 bg-red-50" />
+                                <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-100 rounded-full p-2 sm:p-3 bg-red-50" />
                             </div>
                         </CardContent>
                     </Card>
@@ -163,9 +163,9 @@ const DoctorDashboard = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-yellow-600 font-medium">Attention Requise</p>
-                                    <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.attention}</p>
+                                    <p className="text-xl sm:text-3xl font-bold text-yellow-600 mt-2">{stats.attention}</p>
                                 </div>
-                                <Clock className="w-12 h-12 text-yellow-100 rounded-full p-3 bg-yellow-50" />
+                                <Clock className="w-10 h-10 sm:w-12 sm:h-12 text-yellow-100 rounded-full p-2 sm:p-3 bg-yellow-50" />
                             </div>
                         </CardContent>
                     </Card>
@@ -175,9 +175,9 @@ const DoctorDashboard = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-green-600 font-medium">Stables</p>
-                                    <p className="text-3xl font-bold text-green-600 mt-2">{stats.stable}</p>
+                                    <p className="text-xl sm:text-3xl font-bold text-green-600 mt-2">{stats.stable}</p>
                                 </div>
-                                <CheckCircle className="w-12 h-12 text-green-100 rounded-full p-3 bg-green-50" />
+                                <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 text-green-100 rounded-full p-2 sm:p-3 bg-green-50" />
                             </div>
                         </CardContent>
                     </Card>
@@ -340,35 +340,35 @@ const DoctorDashboard = () => {
                                         <div className="flex flex-wrap gap-2 justify-end">
                                             <button
                                                 onClick={() => handleViewPatient(patient.id)}
-                                                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                                                 title="Voir le détail"
                                             >
                                                 <Eye size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleMessagePatient(patient.id)}
-                                                className="p-2 text-gray-600 hover:bg-blue-100 rounded-lg transition-colors hover:text-blue-600"
+                                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-600 hover:bg-blue-100 rounded-lg transition-colors hover:text-blue-600"
                                                 title="Envoyer un message"
                                             >
                                                 <MessageSquare size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleAddAppointment(patient.id)}
-                                                className="p-2 text-gray-600 hover:bg-green-100 rounded-lg transition-colors hover:text-green-600"
+                                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-600 hover:bg-green-100 rounded-lg transition-colors hover:text-green-600"
                                                 title="Planifier un rendez-vous"
                                             >
                                                 <Calendar size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleEditPatient(patient.id)}
-                                                className="p-2 text-gray-600 hover:bg-yellow-100 rounded-lg transition-colors hover:text-yellow-600"
+                                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-600 hover:bg-yellow-100 rounded-lg transition-colors hover:text-yellow-600"
                                                 title="Éditer"
                                             >
                                                 <Edit size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleViewPatient(patient.id)}
-                                                className="p-2 text-gray-600 hover:bg-indigo-100 rounded-lg transition-colors hover:text-indigo-600"
+                                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-600 hover:bg-indigo-100 rounded-lg transition-colors hover:text-indigo-600"
                                             >
                                                 <ArrowRight size={18} />
                                             </button>

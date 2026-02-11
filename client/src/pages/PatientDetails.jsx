@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles, Edit2, Save, Calendar, Phone, FileText, Upload, Trash2 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, LabelList } from 'recharts';
+import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles, Edit2, Save, Calendar, Phone, FileText, Upload, Trash2, ClipboardList, UserPlus, X, Stethoscope } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import MedicalDossier from '../components/MedicalDossier';
+import FootRiskPanel from '../components/FootRiskPanel';
 
 const PatientDetails = () => {
     const { id } = useParams();
@@ -29,6 +32,12 @@ const PatientDetails = () => {
 
     const [documents, setDocuments] = useState([]);
     const [uploading, setUploading] = useState(false);
+    const [medicalRecords, setMedicalRecords] = useState([]);
+
+    // Care Team Management
+    const [showAddDoctor, setShowAddDoctor] = useState(false);
+    const [allDoctors, setAllDoctors] = useState([]);
+    const [selectedDoctorId, setSelectedDoctorId] = useState('');
 
     const fetchData = async () => {
         if (!currentUser) return;
@@ -36,12 +45,13 @@ const PatientDetails = () => {
             const token = await currentUser.getIdToken();
             const headers = { 'Authorization': `Bearer ${token}` };
 
-            const [patientData, vitalsData, prescriptionsData, appointmentsData, documentsData] = await Promise.all([
+            const [patientData, vitalsData, prescriptionsData, appointmentsData, documentsData, medicalRecordsData] = await Promise.all([
                 fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, { headers }).then(res => res.json()),
                 fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, { headers }).then(res => res.json()),
                 fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`, { headers }).then(res => res.json()),
                 fetch(`${import.meta.env.VITE_API_URL}/api/appointments`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`, { headers }).then(res => res.json())
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/medical-records/patient/${id}`, { headers }).then(res => res.ok ? res.json() : [])
             ]);
 
             setPatient(patientData);
@@ -51,6 +61,7 @@ const PatientDetails = () => {
             const patientApps = appointmentsData.filter(a => String(a.patientId) === String(id));
             setAppointments(patientApps);
             setDocuments(Array.isArray(documentsData) ? documentsData : []);
+            setMedicalRecords(Array.isArray(medicalRecordsData) ? medicalRecordsData : []);
             setLoading(false);
         } catch (err) {
             console.error("Error fetching data", err);
@@ -75,16 +86,21 @@ const PatientDetails = () => {
 
         let specificData = {};
         if (selectedVitalType === 'Glucose') {
+            const val = parseInt(formData.get('value'));
             specificData = {
                 category: 'Glucose',
                 subtype: formData.get('subtype'),
-                value: parseInt(formData.get('value'))
+                value: val,
+                glucose: val
             };
         } else if (selectedVitalType === 'Blood Pressure') {
+            const sys = parseInt(formData.get('systolic'));
+            const dia = parseInt(formData.get('diastolic'));
             specificData = {
                 category: 'Blood Pressure',
-                systolic: parseInt(formData.get('systolic')),
-                diastolic: parseInt(formData.get('diastolic'))
+                systolic: sys,
+                diastolic: dia,
+                value: `${sys}/${dia}`
             };
         } else if (selectedVitalType === 'Weight') {
             specificData = {
@@ -152,6 +168,36 @@ const PatientDetails = () => {
         }
     };
 
+    const handleAddMedicalRecord = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const newRecord = {
+            patientId: id,
+            type: formData.get('recordType'),
+            title: formData.get('title'),
+            content: formData.get('content'),
+            date: formData.get('date') || new Date().toISOString().split('T')[0],
+            doctorName: 'Dr. Specialist'
+        };
+        try {
+            const token = await currentUser.getIdToken();
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/medical-records`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(newRecord),
+            });
+            if (response.ok) {
+                fetchData();
+                e.target.reset();
+            } else {
+                alert('Erreur lors de l\'ajout du dossier medical');
+            }
+        } catch (error) {
+            console.error('Error adding medical record:', error);
+            alert('Erreur lors de l\'ajout du dossier medical');
+        }
+    };
+
     const handleUploadDocument = async (e) => {
         e.preventDefault();
         setUploading(true);
@@ -202,6 +248,60 @@ const PatientDetails = () => {
         }
     };
 
+    const handleAddDoctor = async () => {
+        if (!selectedDoctorId) return;
+        try {
+            const token = await currentUser.getIdToken();
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/doctors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ doctorId: selectedDoctorId }),
+            });
+            if (response.ok) {
+                const updated = await response.json();
+                setPatient(updated);
+                setSelectedDoctorId('');
+                setShowAddDoctor(false);
+            } else {
+                alert('Erreur lors de l\'ajout du médecin');
+            }
+        } catch (error) {
+            console.error('Error adding doctor:', error);
+        }
+    };
+
+    const handleRemoveDoctor = async (doctorId) => {
+        if (!confirm('Retirer ce médecin de l\'équipe soignante ?')) return;
+        try {
+            const token = await currentUser.getIdToken();
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/doctors/${doctorId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (response.ok) {
+                const updated = await response.json();
+                setPatient(updated);
+            } else {
+                const err = await response.json();
+                alert(err.message || 'Erreur');
+            }
+        } catch (error) {
+            console.error('Error removing doctor:', error);
+        }
+    };
+
+    const fetchDoctors = async () => {
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/doctors`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (res.ok) setAllDoctors(await res.json());
+        } catch (e) {
+            console.error('Error fetching doctors:', e);
+        }
+    };
+
     const handleUpdatePhone = async () => {
         try {
             const token = await currentUser.getIdToken();
@@ -249,10 +349,17 @@ const PatientDetails = () => {
     if (loading) return <div className="p-8 text-center text-gray-500">Chargement des détails du patient...</div>;
     if (!patient) return <div className="p-8 text-center text-red-500">Patient non trouvé</div>;
 
-    // Filter vitals for chart and list
-    // Filter vitals for chart and list
+    // Filter vitals for chart and list - use category first, fall back to type field
     const filteredVitals = vitals?.readings
-        ?.filter(v => (v.category === selectedVitalType) || (!v.category && selectedVitalType === 'Glucose'))
+        ?.filter(v => {
+            const vitalType = v.category || v.type;
+            return vitalType === selectedVitalType || (!vitalType && selectedVitalType === 'Glucose');
+        })
+        ?.map(v => ({
+            ...v,
+            // Normalize glucose field so chart dataKey always finds a value
+            glucose: v.glucose ?? (selectedVitalType === 'Glucose' ? (typeof v.value === 'number' ? v.value : parseFloat(v.value)) : undefined),
+        }))
         ?.sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
 
     const chartData = forecast ? [...filteredVitals, ...forecast.predictions] : [...filteredVitals];
@@ -304,7 +411,7 @@ const PatientDetails = () => {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <nav className="bg-white border-b border-gray-200">
+            <nav className="bg-white border-b border-gray-200 print:hidden">
                 <div className="container flex items-center h-16 gap-4">
                     <button onClick={() => navigate('/dashboard')} className="flex items-center text-gray-500 hover:text-primary transition-colors">
                         <ArrowLeft className="w-5 h-5 mr-1" />
@@ -314,17 +421,17 @@ const PatientDetails = () => {
                 </div>
             </nav>
 
-            <main className="container py-8">
+            <main className="container py-4 sm:py-8 px-3 sm:px-4">
                 {/* Header */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                    <div className="flex items-center justify-between">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6 print:hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">{patient.name}</h1>
-                            <div className="flex items-center gap-4 text-gray-500">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 tracking-tight">{patient.name}</h1>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-500 text-sm">
                                 <span>Âge: {patient.age}</span>
-                                <span>•</span>
+                                <span className="hidden sm:inline">•</span>
                                 <span>Type: {patient.type}</span>
-                                <span>•</span>
+                                <span className="hidden sm:inline">•</span>
                                 <div className="flex items-center gap-2">
                                     <Phone size={16} />
                                     {isEditingPhone ? (
@@ -356,10 +463,75 @@ const PatientDetails = () => {
                             </span>
                         </div>
                     </div>
+
+                    {/* Care Team */}
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <Stethoscope size={14} /> Equipe Soignante
+                            </span>
+                            <button
+                                onClick={() => { setShowAddDoctor(!showAddDoctor); if (!showAddDoctor) fetchDoctors(); }}
+                                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                                <UserPlus size={14} /> Ajouter
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(patient.doctors && patient.doctors.length > 0) ? patient.doctors.map(doc => (
+                                <div key={doc.id} className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 text-sm group">
+                                    <span className="font-medium text-blue-900">Dr. {doc.name}</span>
+                                    {doc.specialty && <span className="text-blue-600 text-xs">({doc.specialty})</span>}
+                                    {patient.doctors.length > 1 && (
+                                        <button
+                                            onClick={() => handleRemoveDoctor(doc.id)}
+                                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity ml-1"
+                                            title="Retirer"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            )) : (
+                                <span className="text-sm text-gray-500">
+                                    Dr. {patient.doctorName || 'N/A'} {patient.doctorSpecialty && `(${patient.doctorSpecialty})`}
+                                </span>
+                            )}
+                        </div>
+                        {showAddDoctor && (
+                            <div className="mt-3 flex items-center gap-2">
+                                <select
+                                    value={selectedDoctorId}
+                                    onChange={(e) => setSelectedDoctorId(e.target.value)}
+                                    className="flex-1 rounded-md border-gray-300 shadow-sm text-sm p-2 border"
+                                >
+                                    <option value="">Choisir un médecin...</option>
+                                    {allDoctors
+                                        .filter(d => !(patient.doctors || []).some(pd => String(pd.id) === String(d.id)))
+                                        .map(d => (
+                                            <option key={d.id} value={d.id}>Dr. {d.name} - {d.specialty}</option>
+                                        ))}
+                                </select>
+                                <button
+                                    onClick={handleAddDoctor}
+                                    disabled={!selectedDoctorId}
+                                    className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Ajouter
+                                </button>
+                                <button
+                                    onClick={() => setShowAddDoctor(false)}
+                                    className="px-2 py-2 text-gray-500 hover:text-gray-700"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex space-x-1 bg-white p-1 rounded-lg border border-gray-200 mb-6 w-fit overflow-x-auto">
+                <div className="flex space-x-1 bg-white p-1 rounded-lg border border-gray-200 mb-6 w-full sm:w-fit overflow-x-auto print:hidden">
                     {['Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'].map(type => (
                         <button
                             key={type}
@@ -367,7 +539,7 @@ const PatientDetails = () => {
                                 setSelectedVitalType(type);
                                 setForecast(null);
                             }}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === type
+                            className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === type
                                 ? 'bg-blue-50 text-blue-700 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                 }`}
@@ -377,7 +549,7 @@ const PatientDetails = () => {
                     ))}
                     <button
                         onClick={() => setSelectedVitalType('Prescriptions')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Prescriptions'
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'Prescriptions'
                             ? 'bg-blue-50 text-blue-700 shadow-sm'
                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                             }`}
@@ -386,7 +558,7 @@ const PatientDetails = () => {
                     </button>
                     <button
                         onClick={() => setSelectedVitalType('Appointments')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Appointments'
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'Appointments'
                             ? 'bg-blue-50 text-blue-700 shadow-sm'
                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                             }`}
@@ -395,17 +567,35 @@ const PatientDetails = () => {
                     </button>
                     <button
                         onClick={() => setSelectedVitalType('Documents')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${selectedVitalType === 'Documents'
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'Documents'
                             ? 'bg-blue-50 text-blue-700 shadow-sm'
                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                             }`}
                     >
                         Documents
                     </button>
+                    <button
+                        onClick={() => setSelectedVitalType('MedicalRecords')}
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'MedicalRecords'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Dossier Medical
+                    </button>
+                    <button
+                        onClick={() => setSelectedVitalType('FootRisk')}
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'FootRisk'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Risque Podologique
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-1">
+                    <div className="lg:col-span-2 space-y-6 print:col-span-1">
                         {selectedVitalType === 'Prescriptions' ? (
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Historique des Ordonnances</h3>
@@ -509,7 +699,7 @@ const PatientDetails = () => {
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
                                     <FileText className="text-blue-600" />
-                                    Dossier Médical (Fichiers)
+                                    Documents (Fichiers)
                                 </h3>
                                 {documents.length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -537,6 +727,18 @@ const PatientDetails = () => {
                                     <p className="text-gray-500 text-center py-8">Aucun document archivé.</p>
                                 )}
                             </div>
+
+                        ) : selectedVitalType === 'MedicalRecords' ? (
+                            <MedicalDossier
+                                patient={patient}
+                                vitals={vitals?.readings || []}
+                                prescriptions={prescriptions}
+                                medicalRecords={medicalRecords}
+                                documents={documents}
+                                appointments={appointments}
+                            />
+                        ) : selectedVitalType === 'FootRisk' ? (
+                            <FootRiskPanel patientId={id} patient={patient} />
                         ) : (
                             <>
                                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -567,40 +769,45 @@ const PatientDetails = () => {
                                         </div>
                                     )}
 
-                                    <div className="h-64 w-full">
+                                    <div className="h-52 sm:h-80 w-full">
                                         {chartData.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={chartData}>
+                                                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                     <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                                                    <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                                    <YAxis tick={{ fontSize: 12, fill: '#6B7280', fontWeight: 500 }} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                                                        formatter={(value, name) => [`${value} ${config.unit}`, name === 'systolic' ? 'Systolique' : name === 'diastolic' ? 'Diastolique' : selectedVitalType]}
+                                                    />
                                                     {selectedVitalType === 'Blood Pressure' ? (
                                                         <>
-                                                            <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={2} dot={{ r: 4 }} name="Systolique" />
-                                                            <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={2} dot={{ r: 4 }} name="Diastolique" />
+                                                            <Legend verticalAlign="top" height={36} />
+                                                            <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={3} dot={{ r: 5, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Systolique">
+                                                                <LabelList dataKey="systolic" position="top" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: config.color }} />
+                                                            </Line>
+                                                            <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={3} dot={{ r: 5, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Diastolique">
+                                                                <LabelList dataKey="diastolic" position="bottom" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: '#818CF8' }} />
+                                                            </Line>
                                                         </>
                                                     ) : (
                                                         <Line
                                                             type="monotone"
                                                             dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'}
                                                             stroke={config.color}
-                                                            strokeWidth={2}
+                                                            strokeWidth={3}
                                                             dot={(props) => {
-                                                                // Use custom dot to differentiate predicted values
                                                                 const { cx, cy, payload } = props;
                                                                 if (payload.type === 'predicted') {
-                                                                    return <circle cx={cx} cy={cy} r={4} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
+                                                                    return <circle cx={cx} cy={cy} r={5} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
                                                                 }
-                                                                return <circle cx={cx} cy={cy} r={4} fill={config.color} stroke="white" strokeWidth={2} />;
+                                                                return <circle cx={cx} cy={cy} r={5} fill={config.color} stroke="white" strokeWidth={2} />;
                                                             }}
-                                                            activeDot={{ r: 6 }}
+                                                            activeDot={{ r: 7 }}
                                                             strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
-                                                        // Note: Recharts doesn't easily support mixed dash arrays on a single line unless we separate data. 
-                                                        // For simplicity/robustness, we might need two lines or just show it all solid.
-                                                        // Correction: Let's split it into two lines if needed, OR just accept a solid line for now to keep it simple and robust. 
-                                                        // Actually, simpler is to just render the line. The dots distinguish it.
-                                                        />
+                                                        >
+                                                            <LabelList dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'} position="top" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: config.color }} />
+                                                        </Line>
                                                     )}
                                                 </LineChart>
                                             </ResponsiveContainer>
@@ -613,23 +820,23 @@ const PatientDetails = () => {
                                 </div>
 
                                 {/* List */}
-                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                    <table className="w-full text-left border-collapse">
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[320px]">
                                         <thead>
                                             <tr className="bg-gray-50 border-b border-gray-200">
-                                                <th className="p-4 font-semibold text-gray-600 text-sm">Date</th>
-                                                <th className="p-4 font-semibold text-gray-600 text-sm">Détail</th>
-                                                <th className="p-4 font-semibold text-gray-600 text-sm">Valeur ({config.unit})</th>
+                                                <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Date</th>
+                                                <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Détail</th>
+                                                <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Valeur ({config.unit})</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filteredVitals.slice().reverse().map((reading, index) => (
                                                 <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-slate-50">
-                                                    <td className="p-4 text-gray-700 text-sm">{reading.date}</td>
-                                                    <td className="p-4 text-gray-500 text-sm">
+                                                    <td className="p-2 sm:p-4 text-gray-700 text-xs sm:text-sm">{reading.date}</td>
+                                                    <td className="p-2 sm:p-4 text-gray-500 text-xs sm:text-sm">
                                                         {selectedVitalType === 'Glucose' ? (reading.subtype || reading.type || 'Standard') : '-'}
                                                     </td>
-                                                    <td className="p-4 font-medium text-gray-900">
+                                                    <td className="p-2 sm:p-4 font-medium text-gray-900 text-xs sm:text-sm">
                                                         {selectedVitalType === 'Blood Pressure'
                                                             ? `${reading.systolic}/${reading.diastolic}`
                                                             : (reading.value || reading.glucose)}
@@ -649,13 +856,13 @@ const PatientDetails = () => {
                     </div>
 
                     {/* Add Form */}
-                    <div>
+                    <div className="print:hidden">
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
                             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 text-blue-600">
                                     <span className="text-xl font-light">+</span>
                                 </div>
-                                {selectedVitalType === 'Prescriptions' ? 'Nouvelle Ordonnance' : 'Ajouter une mesure'}
+                                {selectedVitalType === 'Prescriptions' ? 'Nouvelle Ordonnance' : selectedVitalType === 'MedicalRecords' ? 'Nouveau Dossier' : 'Ajouter une mesure'}
                             </h2>
 
                             {selectedVitalType === 'Prescriptions' ? (
@@ -679,6 +886,34 @@ const PatientDetails = () => {
                                     </div>
                                     <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                                         Créer Ordonnance
+                                    </button>
+                                </form>
+                            ) : selectedVitalType === 'MedicalRecords' ? (
+                                <form onSubmit={handleAddMedicalRecord} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Type</label>
+                                        <select name="recordType" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                            <option value="diagnosis">Diagnostic</option>
+                                            <option value="lab_result">Resultat Labo</option>
+                                            <option value="procedure">Procedure</option>
+                                            <option value="clinical_note">Note Clinique</option>
+                                            <option value="referral">Orientation</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Titre</label>
+                                        <input type="text" name="title" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Ex: Diabete Type 2" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Contenu / Details</label>
+                                        <textarea name="content" required rows="4" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="Details du diagnostic, resultats, observations..."></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                        <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />
+                                    </div>
+                                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                        Ajouter au Dossier
                                     </button>
                                 </form>
                             ) : selectedVitalType === 'Documents' ? (

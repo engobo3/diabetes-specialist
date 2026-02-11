@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -26,6 +27,7 @@ const PaymentTerminal = lazy(() => import('./pages/PaymentTerminal'));
 const Specialties = lazy(() => import('./pages/Specialties'));
 const About = lazy(() => import('./pages/About'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation'));
+const PopulationHealth = lazy(() => import('./pages/PopulationHealth'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -89,6 +91,7 @@ function App() {
                 });
             }}
         >
+            <LanguageProvider>
             <AuthProvider>
                 <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
                 <Router>
@@ -112,10 +115,12 @@ function App() {
                             <Route path="/add-patient" element={<ProtectedRoute><AddPatient /></ProtectedRoute>} />
                             <Route path="/edit-patient/:id" element={<ProtectedRoute><EditPatient /></ProtectedRoute>} />
                             <Route path="/patients/:id" element={<ProtectedRoute><PatientDetails /></ProtectedRoute>} />
+                            <Route path="/analytics" element={<ProtectedRoute><PopulationHealth /></ProtectedRoute>} />
                         </Routes>
                     </Suspense>
                 </Router>
             </AuthProvider>
+            </LanguageProvider>
         </PersistQueryClientProvider>
     );
 }

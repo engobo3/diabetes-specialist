@@ -4,7 +4,7 @@
  * @returns {Object} - { isValid: boolean, error: string | null }
  */
 const validatePatient = (patient) => {
-    const { name, age, type, status, doctorId } = patient;
+    const { name, age, type, status, doctorId, doctorIds } = patient;
     const errors = [];
 
     // 1. Name Validation
@@ -29,9 +29,11 @@ const validatePatient = (patient) => {
         errors.push(`Status is required. Allowed values: ${allowedStatuses.join(', ')}.`);
     }
 
-    // 5. Doctor Link Validation
-    if (!doctorId || typeof doctorId !== 'number') {
-        errors.push('Doctor ID is required and must be a number to link the patient.');
+    // 5. Doctor Link Validation (accept doctorId or doctorIds array)
+    const hasDoctorId = !!doctorId;
+    const hasDoctorIds = Array.isArray(doctorIds) && doctorIds.length > 0;
+    if (!hasDoctorId && !hasDoctorIds) {
+        errors.push('At least one Doctor ID is required to link the patient.');
     }
 
     if (errors.length > 0) {

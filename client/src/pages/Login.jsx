@@ -6,10 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { useLanguage } from '../context/LanguageContext';
+import { getTranslations } from '../translations';
 
 const Login = () => {
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
     const { login, currentUser, userRole } = useAuth();
+    const { lang } = useLanguage();
+    const t = getTranslations('login', lang);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -33,11 +37,11 @@ const Login = () => {
                 : email;
 
             await login(authIdentifier, password);
-            toast.success("Connexion réussie !");
+            toast.success(t.loginSuccess);
             // Redirection handled by useEffect
         } catch (err) {
             console.error(err);
-            toast.error("Échec de la connexion. Vérifiez vos identifiants.");
+            toast.error(t.loginFailed);
         }
     };
 
@@ -45,74 +49,74 @@ const Login = () => {
         try {
             const demoEmail = 'demo@glucosoin.com';
             const demoPass = 'demo1234';
-            const toastId = toast.loading("Connexion démo en cours...");
+            const toastId = toast.loading(t.demoLoading);
 
             try {
                 // Try logging in
                 await login(demoEmail, demoPass);
-                toast.success("Mode Démo activé !", { id: toastId });
+                toast.success(t.demoSuccess, { id: toastId });
             } catch (loginErr) {
                 // If user not found, create it
                 if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential') {
                     await createUserWithEmailAndPassword(auth, demoEmail, demoPass);
-                    toast.success("Compte Démo créé et connecté !", { id: toastId });
+                    toast.success(t.demoCreated, { id: toastId });
                     // Login happens automatically after create
                 } else {
-                    toast.error("Erreur démo.", { id: toastId });
+                    toast.error(t.demoError, { id: toastId });
                     throw loginErr;
                 }
             }
         } catch (err) {
             console.error("Demo Login Error:", err);
-            toast.error("Erreur lors de la connexion démo.");
+            toast.error(t.demoLoginError);
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center py-6 sm:py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8 bg-white p-4 sm:p-8 rounded-lg shadow-md">
                 <button
                     onClick={() => navigate('/')}
                     className="flex items-center text-sm text-gray-500 hover:text-blue-600 transition-colors"
                 >
                     <ArrowLeft className="w-4 h-4 mr-1" />
-                    Retour à l'accueil
+                    {t.back}
                 </button>
                 <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        GlucoCare
+                    <h2 className="mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
+                        {t.title}
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
-                        Connectez-vous à votre espace personnel
+                        {t.subtitle}
                     </p>
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
                     <div className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="sr-only">Email ou Téléphone</label>
+                            <label htmlFor="email" className="sr-only">{t.emailLabel}</label>
                             <input
                                 id="email"
                                 type="text"
                                 {...register("email", {
-                                    required: "Email ou téléphone requis",
+                                    required: t.emailRequired,
                                 })}
                                 className={`appearance-none relative block w-full px-3 py-2 border ${errors.email ? 'border-red-500' : 'border-gray-300'} placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
-                                placeholder="Email ou Téléphone"
+                                placeholder={t.emailPlaceholder}
                             />
                             {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
                         </div>
                         <div>
-                            <label htmlFor="password" className="sr-only">Mot de passe</label>
+                            <label htmlFor="password" className="sr-only">{t.passwordLabel}</label>
                             <input
                                 id="password"
                                 type="password"
                                 {...register("password", {
-                                    required: "Mot de passe requis",
-                                    minLength: { value: 6, message: "Le mot de passe doit contenir au moins 6 caractères" }
+                                    required: t.passwordRequired,
+                                    minLength: { value: 6, message: t.passwordMin }
                                 })}
                                 className={`appearance-none relative block w-full px-3 py-2 border ${errors.password ? 'border-red-500' : 'border-gray-300'} placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
-                                placeholder="Mot de passe"
+                                placeholder={t.passwordPlaceholder}
                             />
                             {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>}
                         </div>
@@ -127,7 +131,7 @@ const Login = () => {
                             {isSubmitting ? (
                                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                             ) : (
-                                'Se connecter'
+                                t.submit
                             )}
                         </button>
                     </div>
@@ -135,12 +139,12 @@ const Login = () => {
 
                 <div className="mt-6 text-center">
                     <p className="text-sm text-gray-600 mb-4">
-                        Première visite ?{' '}
+                        {t.firstVisit}{' '}
                         <button
                             onClick={() => navigate('/register')}
                             className="font-medium text-blue-600 hover:text-blue-500"
                         >
-                            Activer votre compte patient
+                            {t.activateAccount}
                         </button>
                     </p>
 
@@ -149,7 +153,7 @@ const Login = () => {
                             <div className="w-full border-t border-gray-300"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                            <span className="px-2 bg-white text-gray-500">Recruteurs / Visiteurs</span>
+                            <span className="px-2 bg-white text-gray-500">{t.recruiters}</span>
                         </div>
                     </div>
 
@@ -159,7 +163,7 @@ const Login = () => {
                         disabled={isSubmitting}
                         className="mt-4 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
                     >
-                        👨‍⚕️ Accès Démo (Médecin)
+                        {t.demoAccess}
                     </button>
                 </div>
             </div>

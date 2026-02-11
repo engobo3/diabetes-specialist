@@ -9,7 +9,7 @@ const DocumentSchema = z.object({
     date: z.string(), // ISO
     type: z.string().optional(),
     url: z.string().optional(),
-    // Add other fields as needed
+    size: z.string().optional(),
 });
 
 class PatientDocumentRepository extends BaseRepository {

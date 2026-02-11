@@ -127,8 +127,8 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
     };
 
     return (
-        <div className="flex flex-col h-[500px] bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex justify-between items-center">
+        <div className="flex flex-col h-[calc(100vh-200px)] sm:h-[500px] bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex justify-between items-center">
                 <h3 className="font-semibold text-gray-800">Conversation avec {contactName}</h3>
                 <span className="text-xs text-gray-300">{version}</span>
             </div>
@@ -146,9 +146,9 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
 
                         return (
                             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[70%] rounded-lg p-3 ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+                                <div className={`max-w-[85%] sm:max-w-[70%] rounded-lg p-3 ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
                                     }`}>
-                                    <p className="text-sm">{msg.text}</p>
+                                    <p className="text-sm break-words">{msg.text}</p>
                                     <span className={`text-xs block mt-1 ${isMe ? 'text-blue-100' : 'text-gray-400'}`}>
                                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -166,7 +166,7 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
                         {error}
                     </div>
                 )}
-                <form onSubmit={handleSend} className="p-4 border-t border-gray-200">
+                <form onSubmit={handleSend} className="p-2 sm:p-4 border-t border-gray-200">
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -174,12 +174,12 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Écrivez votre message..."
                             disabled={isSending}
-                            className="flex-1 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            className="flex-1 p-2 min-h-[44px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         />
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || isSending}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="bg-blue-600 text-white px-4 py-2 min-h-[44px] min-w-[44px] rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {isSending ? 'Envoi...' : 'Envoyer'}
                         </button>

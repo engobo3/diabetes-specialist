@@ -4,6 +4,7 @@
  * Supports multiple providers: SendGrid, Nodemailer, Console (dev)
  */
 
+const nodemailer = require('nodemailer');
 const auditLogger = require('./auditLogger');
 
 class EmailNotificationService {
@@ -12,6 +13,7 @@ class EmailNotificationService {
         this.from = process.env.EMAIL_FROM || 'noreply@glucosoin.com';
         this.adminEmail = process.env.ADMIN_EMAIL || 'admin@glucosoin.com';
         this.enabled = process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'false';
+        this.transporter = null;
 
         this._initializeProvider();
     }
@@ -24,14 +26,18 @@ class EmailNotificationService {
 
         switch (this.provider) {
             case 'sendgrid':
-                // SendGrid would be initialized here
-                // this.sgMail = require('@sendgrid/mail');
-                // this.sgMail.setApiKey(process.env.SENDGRID_API_KEY);
                 console.log('Email provider: SendGrid (not configured)');
                 break;
             case 'nodemailer':
-                // Nodemailer would be initialized here
-                console.log('Email provider: Nodemailer (not configured)');
+                this.transporter = nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user: process.env.GMAIL_USER,
+                        pass: process.env.GMAIL_APP_PASSWORD
+                    }
+                });
+                this.from = process.env.EMAIL_FROM || process.env.GMAIL_USER;
+                console.log(`Email provider: Nodemailer (Gmail: ${process.env.GMAIL_USER})`);
                 break;
             case 'console':
             default:
@@ -56,8 +62,8 @@ class EmailNotificationService {
                     break;
 
                 case 'nodemailer':
-                    // await this.transporter.sendMail({ from: this.from, to, subject, text, html });
-                    console.log(`[Nodemailer] Would send: ${subject} to ${to}`);
+                    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+                    console.log(`[Nodemailer] Sent: ${subject} to ${to}`);
                     break;
 
                 case 'console':

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Copy, Check, Send } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 
 const AddPatient = () => {
     const navigate = useNavigate();
     const { currentUser, doctorProfile } = useAuth();
+    const [successData, setSuccessData] = useState(null);
+    const [copied, setCopied] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -45,7 +47,12 @@ const AddPatient = () => {
             });
 
             if (response.ok) {
-                navigate('/dashboard');
+                const data = await response.json();
+                if (data.activationCode) {
+                    setSuccessData(data);
+                } else {
+                    navigate('/dashboard');
+                }
             } else {
                 const errData = await response.json();
                 alert(`Erreur: ${errData.message || 'Impossible de créer le patient'}`);
@@ -67,8 +74,60 @@ const AddPatient = () => {
                 </div>
             </nav>
 
-            <main className="container py-8">
-                <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+            <main className="container py-4 sm:py-8 px-3 sm:px-4">
+                {successData ? (
+                    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                        <CheckCircle className="text-green-500 mx-auto mb-4" size={48} />
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Patient ajouté avec succès !</h2>
+                        {successData.email && (
+                            <p className="text-gray-600 mb-4">
+                                Un code d'activation a été envoyé à <strong>{successData.email}</strong>
+                            </p>
+                        )}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <p className="text-sm text-blue-700 mb-2">Code d'activation (à communiquer au patient) :</p>
+                            <div className="flex items-center justify-center gap-3">
+                                <p className="text-3xl font-mono font-bold tracking-widest text-blue-900">
+                                    {successData.activationCode}
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(successData.activationCode);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }}
+                                    className="p-2 rounded-md hover:bg-blue-100 transition-colors"
+                                    title="Copier le code"
+                                >
+                                    {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} className="text-blue-600" />}
+                                </button>
+                            </div>
+                            <p className="text-xs text-blue-600 mt-2">Valide pendant 24 heures</p>
+                        </div>
+                        {successData.phone && (
+                            <a
+                                href={`https://wa.me/${successData.phone.replace(/[\s-]/g, '').replace(/^\+/, '').replace(/^0/, '243')}?text=${encodeURIComponent(
+                                    `Bonjour ${successData.name},\n\nVotre médecin vous a inscrit sur GlucoCare.\n\nVotre code d'activation : ${successData.activationCode}\n\nRendez-vous sur https://diabetes-specialist.web.app/register pour créer votre compte.\n\nCe code est valide pendant 24 heures.`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors mb-4"
+                            >
+                                <Send size={18} />
+                                Envoyer via WhatsApp
+                            </a>
+                        )}
+                        <div>
+                            <button
+                                onClick={() => navigate('/dashboard')}
+                                className="btn btn-primary"
+                            >
+                                Retour au tableau de bord
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-8">
                     <h1 className="text-2xl font-bold text-gray-900 mb-6">Nouveau Patient</h1>
 
                     <form onSubmit={handleSubmit}>
@@ -146,7 +205,8 @@ const AddPatient = () => {
                             >
                                 <option value="Type 1">Type 1</option>
                                 <option value="Type 2">Type 2</option>
-                                <option value="Pre-diabetic">Pré-diabétique</option>
+                                <option value="Prediabetes">Pré-diabétique</option>
+                                <option value="Gestational">Gestationnel</option>
                             </select>
                         </div>
 
@@ -177,6 +237,7 @@ const AddPatient = () => {
                         </div>
                     </form>
                 </div>
+                )}
             </main>
         </div>
     );

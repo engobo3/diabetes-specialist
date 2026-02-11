@@ -8,12 +8,10 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const verifyToken = require('../middleware/authMiddleware');
-const { validateSession } = require('../middleware/sessionMiddleware');
 const { rateLimit } = require('../middleware/securityMiddleware');
 
-// Apply authentication and session validation to all payment routes
+// Apply authentication to all payment routes
 router.use(verifyToken);
-router.use(validateSession);
 
 // Apply stricter rate limiting for payment endpoints (100 requests per 15 minutes)
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 100 }));
@@ -57,6 +55,13 @@ router.post('/cash', paymentController.initiateCashPayment);
  * @query   status - Filter by status (pending, completed, failed, etc.)
  */
 router.get('/transactions', paymentController.getUserTransactions);
+
+/**
+ * @route   GET /api/payments/patient/:patientId
+ * @desc    Get payment transactions for a specific patient
+ * @access  Private
+ */
+router.get('/patient/:patientId', paymentController.getPatientTransactions);
 
 /**
  * @route   GET /api/payments/:transactionId/status

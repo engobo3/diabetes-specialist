@@ -3,10 +3,12 @@ const { z } = require('zod');
 const PrescriptionSchema = z.object({
     id: z.union([z.string(), z.number()]).optional(),
     patientId: z.union([z.string(), z.number()]),
-    doctorName: z.string(), // Often stored directly
+    doctorName: z.string().optional(),
     medication: z.string(),
     dosage: z.string(),
-    frequency: z.string(),
+    frequency: z.string().optional(),
+    instructions: z.string().optional(),
+    date: z.string().optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
     status: z.enum(['Active', 'Completed', 'Discontinued']).default('Active'),

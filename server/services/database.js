@@ -46,6 +46,10 @@ const deletePatient = async (id) => {
     return patientRepo.delete(id);
 };
 
+const getPatientsByDoctorId = async (doctorId) => {
+    return patientRepo.findByDoctorId(doctorId);
+};
+
 // --- Doctor Operations --- (if needed exposed)
 
 // --- Appointment Operations ---
@@ -141,6 +145,7 @@ module.exports = {
     createPatient,
     deletePatient,
     updatePatient,
+    getPatientsByDoctorId,
     migrateToFirestore,
     getVitals,
     addVital,

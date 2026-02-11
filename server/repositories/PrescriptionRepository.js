@@ -11,9 +11,22 @@ class PrescriptionRepository extends BaseRepository {
         try {
             if (db) {
                 try {
-                    const snapshot = await db.collection(this.collectionName)
-                        .where('patientId', '==', parseInt(patientId))
+                    // Query with both string and number forms since patientId type may vary
+                    const numId = parseInt(patientId);
+                    const strId = String(patientId);
+
+                    // Try numeric match first (legacy data)
+                    let snapshot = await db.collection(this.collectionName)
+                        .where('patientId', '==', isNaN(numId) ? strId : numId)
                         .get();
+
+                    // If no results, try string match
+                    if (snapshot.empty && !isNaN(numId)) {
+                        snapshot = await db.collection(this.collectionName)
+                            .where('patientId', '==', strId)
+                            .get();
+                    }
+
                     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 } catch (fsError) {
                     console.error('Firestore Error in findByPatientId (Fallback to Local):', fsError.message);

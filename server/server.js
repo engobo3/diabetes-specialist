@@ -27,7 +27,7 @@ app.use(sanitizeInput); // Sanitize all input (needs parsed body)
 app.use(validateContentType); // Validate content type for POST/PUT/PATCH
 
 app.get('/', (req, res) => {
-    res.send('Diabetes Specialist API is running - Secured');
+    res.send('Diabetes Specialist API v2.1 - Running');
 });
 
 // Import Routes
@@ -46,6 +46,10 @@ app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/2fa', require('./routes/twoFactorAuthRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 app.use('/api/security/dashboard', require('./routes/securityDashboardRoutes'));
+app.use('/api/medical-records', require('./routes/medicalRecordRoutes'));
+app.use('/api/export', require('./routes/exportRoutes'));
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/foot-risk', require('./routes/footRiskRoutes'));
 
 // --- Firebase Functions Setup ---
 const { onRequest } = require('firebase-functions/v2/https');

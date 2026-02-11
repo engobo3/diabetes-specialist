@@ -5,6 +5,7 @@
  */
 
 const FlexPay = require('flexpay');
+const admin = require('firebase-admin');
 const { db } = require('../config/firebaseConfig');
 const auditLogger = require('./auditLogger');
 const emailService = require('./emailNotificationService');
@@ -277,6 +278,8 @@ class FlexPayService {
                 description,
                 userId,
                 userEmail,
+                patientId,
+                doctorId,
                 locationDetails,
                 metadata = {}
             } = paymentData;
@@ -285,7 +288,7 @@ class FlexPayService {
                 throw new Error('Invalid amount');
             }
 
-            // Create transaction record for cash payment
+            // Create transaction record for cash payment - auto-completed since cash is in-person
             const transaction = await this._createTransaction({
                 amount,
                 currency,
@@ -294,28 +297,25 @@ class FlexPayService {
                 description,
                 userId,
                 userEmail,
-                status: this.STATUS.PENDING,
+                patientId: patientId || userId,
+                doctorId: doctorId || null,
+                status: this.STATUS.COMPLETED,
+                completedAt: new Date().toISOString(),
                 locationDetails,
-                metadata,
-                requiresManualConfirmation: true
+                metadata
             });
 
-            // Notify admin about pending cash payment
-            await emailService.sendEmail({
-                to: process.env.ADMIN_EMAIL || 'admin@glucosoin.com',
-                subject: '💵 Pending Cash Payment Confirmation',
-                text: `
-Cash payment pending confirmation:
-
-Transaction ID: ${transaction.id}
-Amount: ${amount} ${currency}
-User: ${userEmail}
-Location: ${locationDetails || 'Not specified'}
-Description: ${description}
-
-Please confirm receipt and update transaction status.
-                `.trim()
-            }).catch(err => console.error('Email notification failed:', err));
+            // Update doctor's totalRevenue (90% goes to doctor)
+            if (doctorId) {
+                try {
+                    const doctorShare = Math.round(amount * 0.9);
+                    await db.collection('doctors').doc(String(doctorId)).update({
+                        totalRevenue: admin.firestore.FieldValue.increment(doctorShare)
+                    });
+                } catch (revenueErr) {
+                    console.error('Failed to update doctor revenue:', revenueErr);
+                }
+            }
 
             await auditLogger.logDataModification({
                 userId,
@@ -323,20 +323,20 @@ Please confirm receipt and update transaction status.
                 resourceType: 'payment',
                 resourceId: transaction.id,
                 action: 'create',
-                changes: { status: 'pending_confirmation', method: 'cash', amount },
+                changes: { status: 'completed', method: 'cash', amount },
                 success: true
             });
 
             return {
                 success: true,
                 transactionId: transaction.id,
-                status: this.STATUS.PENDING,
-                message: 'Cash payment recorded. Awaiting admin confirmation.',
-                instructions: 'Please proceed to make payment at the specified location. Your payment will be confirmed by our staff.',
+                status: this.STATUS.COMPLETED,
+                message: 'Paiement en espèces enregistré avec succès.',
                 data: {
                     amount,
                     currency,
-                    locationDetails
+                    patientId,
+                    doctorId
                 }
             };
         } catch (error) {
@@ -588,11 +588,41 @@ ${transaction.paymentMethod === 'cash' ? 'Please contact us to arrange cash refu
         }
     }
 
+    /**
+     * Get patient transactions
+     * @param {string} patientId - Patient ID
+     * @param {Object} options - Query options
+     * @returns {Promise<Array>} Transactions
+     */
+    async getPatientTransactions(patientId, options = {}) {
+        try {
+            const { limit = 50 } = options;
+
+            const snapshot = await db.collection(this.collectionName)
+                .where('patientId', '==', patientId)
+                .orderBy('createdAt', 'desc')
+                .limit(limit)
+                .get();
+
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error('Get patient transactions error:', error);
+            return [];
+        }
+    }
+
     // Helper methods
 
     async _createTransaction(data) {
+        // Filter out undefined values (Firestore rejects undefined)
+        const cleanData = Object.fromEntries(
+            Object.entries(data).filter(([_, v]) => v !== undefined)
+        );
         const transaction = {
-            ...data,
+            ...cleanData,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };

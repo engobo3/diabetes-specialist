@@ -107,6 +107,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Medical Records
+    match /medical_records/{recordId} {
+      allow read: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        isDoctor() ||
+        isAdmin()
+      );
+      allow create, update: if isDoctor() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // Vitals
     match /vitals/{vitalId} {
       allow read: if isAuthenticated() && (

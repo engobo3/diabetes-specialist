@@ -6,8 +6,9 @@ import Input from './ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { useAuth } from '../context/AuthContext';
 
-const PaymentForm = ({ onSuccess, doctorId }) => {
-    const { currentUser, patientId } = useAuth();
+const PaymentForm = ({ onSuccess, doctorId, patientId: propPatientId }) => {
+    const { currentUser, patientId: authPatientId } = useAuth();
+    const patientId = propPatientId || authPatientId;
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState('CDF'); // CDF or USD
     const [method, setMethod] = useState('Cash'); // Cash, M-Pesa, Orange Money, Airtel Money, Card
@@ -38,22 +39,30 @@ const PaymentForm = ({ onSuccess, doctorId }) => {
             setLoadingStep('finalizing');
 
             const token = await currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments`, {
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+
+            // Route to correct endpoint based on payment method
+            let endpoint;
+            let body;
+            if (method === 'Cash') {
+                endpoint = `${apiUrl}/api/payments/cash`;
+                body = { amount: parseFloat(amount), currency, description: 'Consultation médicale', patientId, doctorId };
+            } else if (method === 'Card') {
+                endpoint = `${apiUrl}/api/payments/card`;
+                body = { amount: parseFloat(amount), currency, description: 'Consultation médicale', patientId, doctorId, cardNumber: '0000', cardExpiry: '12/30', cardCvv: '000' };
+            } else {
+                // Mobile money
+                endpoint = `${apiUrl}/api/payments/mobile-money`;
+                body = { amount: parseFloat(amount), currency, phoneNumber, provider: method, description: 'Consultation médicale', patientId, doctorId };
+            }
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    patientId,
-                    doctorId,
-                    amount,
-                    currency,
-                    method,
-                    phoneNumber: isMobileMoney ? phoneNumber : null,
-                    description: 'Medical Consultation / Services',
-                    status: 'Completed' // In a real app, this would depend on the gateway response
-                })
+                body: JSON.stringify(body)
             });
 
             if (response.ok) {
@@ -83,7 +92,7 @@ const PaymentForm = ({ onSuccess, doctorId }) => {
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Amount & Currency */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Montant</label>
                             <Input
@@ -118,7 +127,7 @@ const PaymentForm = ({ onSuccess, doctorId }) => {
                     {/* Payment Method */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Moyen de Paiement</label>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             {[
                                 { id: 'Cash', icon: Banknote, label: 'Espèces' },
                                 { id: 'Card', icon: CreditCard, label: 'Carte' },
@@ -130,7 +139,7 @@ const PaymentForm = ({ onSuccess, doctorId }) => {
                                     key={m.id}
                                     type="button"
                                     onClick={() => setMethod(m.id)}
-                                    className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border transition-all ${method === m.id
+                                    className={`flex flex-col items-center justify-center gap-2 p-3 min-h-[48px] rounded-lg border transition-all ${method === m.id
                                         ? 'border-primary bg-primary/5 text-primary'
                                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                                         }`}

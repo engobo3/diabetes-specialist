@@ -50,9 +50,9 @@ const FindDoctor = () => {
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
             <Header />
 
-            <div className="bg-primary py-12 text-white">
+            <div className="bg-primary py-8 sm:py-12 text-white">
                 <div className="container mx-auto px-4 text-center">
-                    <h1 className="text-4xl font-serif font-bold mb-4">Trouver un Médecin</h1>
+                    <h1 className="text-2xl sm:text-4xl font-serif font-bold mb-4">Trouver un Médecin</h1>
                     <p className="text-lg text-teal-100 max-w-2xl mx-auto mb-8">
                         Recherchez parmi nos spécialistes de classe mondiale pour trouver les soins adaptés à vos besoins.
                     </p>

@@ -152,17 +152,23 @@ export const AuthProvider = ({ children }) => {
                         if (!defaultRole) {
                             defaultRole = 'doctor';
                         }
+
+                        // Detect admin from doctor record's isAdmin flag
+                        if (doctorRecord.isAdmin) {
+                            roles.push('admin');
+                        }
                     }
 
-                    // Check if user is an admin
-                    if (userProfileRes.ok) {
-                        const userProfile = await userProfileRes.json();
-                        if (userProfile.role === 'admin') {
-                            roles.push('admin');
-                            // If user is admin+doctor, default to doctor for daily use
-                            if (!defaultRole) {
-                                defaultRole = 'admin';
+                    // Fallback: also check users collection for admin role
+                    // Only grant admin to users who are also doctors (not patients)
+                    if (!roles.includes('admin') && roles.includes('doctor') && userProfileRes.ok) {
+                        try {
+                            const userProfile = await userProfileRes.json();
+                            if (userProfile.role === 'admin') {
+                                roles.push('admin');
                             }
+                        } catch (e) {
+                            console.warn('Failed to parse user profile response', e);
                         }
                     }
 

@@ -1,17 +1,72 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Bot, User, Loader } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { MessageSquare, Send, X, Bot, User, Loader, RotateCcw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { getTranslations } from '../translations';
 import Button from './ui/Button';
 
-const AiAssistant = () => {
+const AiAssistant = ({ patient, vitals, prescriptions }) => {
+    const { lang } = useLanguage();
+    const t = getTranslations('aiAssistant', lang);
+
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: "Bonjour ! Je suis GlucoBot 🤖. Comment puis-je vous aider aujourd'hui avec votre santé ou l'application ?" }
+        { role: 'assistant', text: t.greeting }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
     const { currentUser } = useAuth();
+
+    // Reset greeting when language changes
+    useEffect(() => {
+        setMessages([{ role: 'assistant', text: t.greeting }]);
+    }, [lang]);
+
+    // Build patient context from props
+    const patientContext = useMemo(() => {
+        if (!patient) return null;
+
+        const readings = vitals?.readings || [];
+
+        // Last 5 glucose readings (use category || type fallback)
+        const recentGlucose = readings
+            .filter(v => (v.category || v.type) === 'Glucose' || (!v.category && !v.type))
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 5)
+            .map(v => ({ date: v.date, value: v.glucose ?? v.value }));
+
+        // Last 3 BP readings
+        const recentBP = readings
+            .filter(v => (v.category || v.type) === 'Blood Pressure')
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 3)
+            .map(v => ({ date: v.date, systolic: v.systolic, diastolic: v.diastolic }));
+
+        // Latest weight
+        const weightReadings = readings
+            .filter(v => (v.category || v.type) === 'Weight')
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        const latestWeight = weightReadings.length > 0 ? weightReadings[0].value : null;
+
+        // Active medications
+        const medications = (prescriptions || []).map(p => ({
+            name: p.medication,
+            dosage: p.dosage
+        }));
+
+        return {
+            name: patient.name,
+            age: patient.age,
+            type: patient.type || patient.diabetesType,
+            conditions: patient.conditions || [],
+            allergies: patient.allergies || [],
+            recentGlucose,
+            recentBP,
+            medications,
+            latestWeight,
+        };
+    }, [patient, vitals, prescriptions]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,10 +82,17 @@ const AiAssistant = () => {
 
         const userMessage = input;
         setInput('');
-        setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+        const newMessages = [...messages, { role: 'user', text: userMessage }];
+        setMessages(newMessages);
         setLoading(true);
 
         try {
+            // Build history (cap at last 10, exclude the greeting)
+            const history = newMessages
+                .slice(1) // skip initial greeting
+                .slice(-10)
+                .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', text: m.text }));
+
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
                 method: 'POST',
                 headers: {
@@ -39,10 +101,9 @@ const AiAssistant = () => {
                 },
                 body: JSON.stringify({
                     message: userMessage,
-                    context: {
-                        userId: currentUser?.uid,
-                        email: currentUser?.email
-                    }
+                    history,
+                    patientContext,
+                    lang,
                 })
             });
 
@@ -55,17 +116,21 @@ const AiAssistant = () => {
             }
         } catch (error) {
             console.error("Chat error:", error);
-            setMessages(prev => [...prev, { role: 'assistant', text: "Désolé, j'ai eu un problème de connexion. Veuillez réessayer." }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: t.errorMessage }]);
         } finally {
             setLoading(false);
         }
     };
 
+    const clearChat = () => {
+        setMessages([{ role: 'assistant', text: t.greeting }]);
+    };
+
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
             {/* Chat Window */}
             {isOpen && (
-                <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-80 sm:w-96 h-[500px] flex flex-col mb-4 overflow-hidden transition-all duration-200 ease-in-out">
+                <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-[calc(100vw-2rem)] sm:w-96 h-[calc(100vh-120px)] sm:h-[500px] flex flex-col mb-4 overflow-hidden transition-all duration-200 ease-in-out">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-primary to-blue-600 p-4 flex justify-between items-center text-white">
                         <div className="flex items-center gap-2">
@@ -76,16 +141,25 @@ const AiAssistant = () => {
                                 <h3 className="font-bold text-sm">GlucoBot</h3>
                                 <div className="flex items-center gap-1">
                                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                    <span className="text-xs opacity-90">En ligne</span>
+                                    <span className="text-xs opacity-90">{t.online}</span>
                                 </div>
                             </div>
                         </div>
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-full transition-colors"
-                        >
-                            <X size={18} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={clearChat}
+                                className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors"
+                                title={t.clearChat}
+                            >
+                                <RotateCcw size={16} />
+                            </button>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-full transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
@@ -96,7 +170,7 @@ const AiAssistant = () => {
                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${msg.role === 'user'
+                                    className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm break-words ${msg.role === 'user'
                                             ? 'bg-primary text-white rounded-br-none'
                                             : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                                         }`}
@@ -118,13 +192,13 @@ const AiAssistant = () => {
                     </div>
 
                     {/* Input Area */}
-                    <form onSubmit={handleSend} className="p-4 bg-white border-t border-gray-100">
+                    <form onSubmit={handleSend} className="p-3 sm:p-4 bg-white border-t border-gray-100">
                         <div className="relative">
                             <input
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Posez une question..."
+                                placeholder={t.placeholder}
                                 className="w-full pr-12 pl-4 py-3 bg-gray-100 border-none rounded-full focus:ring-2 focus:ring-primary/20 text-sm focus:bg-white transition-colors"
                             />
                             <button
@@ -137,7 +211,7 @@ const AiAssistant = () => {
                         </div>
                         <div className="text-center mt-2">
                             <span className="text-[10px] text-gray-400">
-                                L'IA peut faire des erreurs. Consultez un médecin.
+                                {t.disclaimer}
                             </span>
                         </div>
                     </form>

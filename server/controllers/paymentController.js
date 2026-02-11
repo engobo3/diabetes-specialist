@@ -100,7 +100,7 @@ exports.initiateCardPayment = async (req, res) => {
 exports.initiateCashPayment = async (req, res) => {
     try {
         const { uid, email } = req.user;
-        const { amount, description, locationDetails, currency } = req.body;
+        const { amount, description, locationDetails, currency, patientId, doctorId } = req.body;
 
         if (!amount) {
             return res.status(400).json({
@@ -115,7 +115,9 @@ exports.initiateCashPayment = async (req, res) => {
             description,
             locationDetails,
             userId: uid,
-            userEmail: email
+            userEmail: email,
+            patientId: patientId || uid,
+            doctorId: doctorId || null
         });
 
         res.status(201).json(result);
@@ -328,6 +330,33 @@ exports.handleWebhook = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Webhook processing failed',
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Get patient transactions
+ * GET /api/payments/patient/:patientId
+ */
+exports.getPatientTransactions = async (req, res) => {
+    try {
+        const { patientId } = req.params;
+
+        const transactions = await flexpayService.getPatientTransactions(patientId);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                transactions,
+                count: transactions.length
+            }
+        });
+    } catch (error) {
+        console.error('Get patient transactions error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch patient transactions',
             message: error.message
         });
     }

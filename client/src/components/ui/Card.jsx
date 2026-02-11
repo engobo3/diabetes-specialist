@@ -10,7 +10,7 @@ const Card = ({ children, className = '', ...props }) => {
 
 const CardHeader = ({ children, className = '', ...props }) => {
     return (
-        <div className={`px-6 py-4 border-b border-gray-100 ${className}`} {...props}>
+        <div className={`px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 ${className}`} {...props}>
             {children}
         </div>
     );
@@ -26,7 +26,7 @@ const CardTitle = ({ children, className = '', ...props }) => {
 
 const CardContent = ({ children, className = '', ...props }) => {
     return (
-        <div className={`p-6 ${className}`} {...props}>
+        <div className={`p-4 sm:p-6 ${className}`} {...props}>
             {children}
         </div>
     );

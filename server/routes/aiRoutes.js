@@ -1,13 +1,138 @@
 const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const verifyToken = require('../middleware/authMiddleware');
+
+// Auth on all AI routes
+router.use(verifyToken);
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
+const MODEL_NAME = "gemini-2.0-flash";
 
+const LANG_NAMES = { fr: 'francais', ln: 'lingala', sw: 'kiswahili', tsh: 'tshiluba', kg: 'kikongo' };
+
+// ─── System Prompt Builder ──────────────────────────────────────────
+function buildSystemPrompt(ctx, langName) {
+    let patientSection = '';
+    if (ctx) {
+        const parts = [];
+        if (ctx.name) parts.push(`Nom: ${ctx.name}`);
+        if (ctx.age) parts.push(`Age: ${ctx.age}`);
+        if (ctx.type) parts.push(`Type de diabete: ${ctx.type}`);
+        if (ctx.conditions?.length) parts.push(`Conditions: ${ctx.conditions.join(', ')}`);
+        if (ctx.allergies?.length) parts.push(`Allergies: ${ctx.allergies.join(', ')}`);
+        if (ctx.latestWeight) parts.push(`Poids actuel: ${ctx.latestWeight} kg`);
+        if (ctx.medications?.length) {
+            parts.push(`Medicaments: ${ctx.medications.map(m => `${m.name} (${m.dosage})`).join(', ')}`);
+        }
+        if (ctx.recentGlucose?.length) {
+            parts.push(`Glycemie recente: ${ctx.recentGlucose.map(g => `${g.date}: ${g.value} mg/dL`).join(', ')}`);
+        }
+        if (ctx.recentBP?.length) {
+            parts.push(`Tension recente: ${ctx.recentBP.map(b => `${b.date}: ${b.systolic}/${b.diastolic}`).join(', ')}`);
+        }
+        patientSection = `\n\nPROFIL DU PATIENT:\n${parts.join('\n')}`;
+    }
+
+    return `Tu es GlucoBot, un assistant IA specialise en diabetologie pour l'application GlucoSoin, utilisee en RD Congo et en Afrique Centrale.
+
+ROLE: Tu accompagnes les patients diabetiques au quotidien avec empathie et expertise.${patientSection}
+
+REGLES:
+- Reponds TOUJOURS en ${langName}.
+- Sois concis (2-3 phrases max sauf si on te demande des details).
+- Sois empathique, encourageant et clair.
+- Utilise les donnees du patient ci-dessus pour personnaliser tes reponses.
+- Si la glycemie est < 54 mg/dL ou > 300 mg/dL, ALERTE le patient et recommande de consulter immediatement.
+- Ne fais JAMAIS de diagnostic ni de prescription. Recommande toujours de consulter un vrai medecin.
+- L'application s'appelle "GlucoSoin".`;
+}
+
+// ─── Conversation Context Builder ───────────────────────────────────
+function buildConversationContext(history) {
+    if (!history || history.length === 0) return '';
+    const recent = history.slice(-10);
+    const lines = recent.map(m =>
+        m.role === 'user' ? `Patient: ${m.text}` : `GlucoBot: ${m.text}`
+    );
+    return `\n\nHISTORIQUE DE CONVERSATION:\n${lines.join('\n')}\n`;
+}
+
+// ─── Multilingual Fallback Responses ────────────────────────────────
+const FALLBACK_RESPONSES = {
+    fr: {
+        emergency: "Attention : Pour tout symptome grave (douleur thoracique, difficulte a respirer, blessure au pied, troubles de la vision), consultez immediatement un medecin ou allez aux urgences.",
+        nutrition: "Privilegiez les aliments a index glycemique bas (legumes, cereales completes, legumineuses). Associez toujours des proteines et des fibres a vos glucides pour eviter les pics de glycemie.",
+        exercise: "Bouger 30 minutes par jour aide enormement a reguler la glycemie. La marche rapide est ideale. Verifiez votre taux avant et apres l'effort.",
+        glucose_tracking: "La regularite est la cle. Notez vos valeurs a jeun et 2h apres les repas. Une glycemie normale a jeun se situe entre 70 et 100 mg/dL.",
+        mental_health: "Le diabete peut etre stressant. Le stress influence directement votre glycemie. Prenez du temps pour vous detendre et dormez suffisamment.",
+        medication: "Respectez scrupuleusement votre ordonnance. En cas d'oubli ou d'effets secondaires, contactez votre medecin. Verifiez la date de peremption de votre insuline.",
+        general: "Bonjour ! Je suis GlucoBot. Je peux vous aider avec des conseils sur l'alimentation, le sport, la gestion de la glycemie ou votre bien-etre.",
+        unknown: "Je ne suis pas sur de comprendre. Je peux parler de : nutrition, sport, glycemie, stress, medicaments. Essayez de reformuler.",
+        error: "Desole, je suis en maintenance. N'oubliez pas de bien vous hydrater !"
+    },
+    ln: {
+        emergency: "Keba : Mpo na maladi ya makasi (mpasi ya ntolo, mpasi ya kopema, mpota na lokolo, mitungisi ya miso), kende na monganga to na urgence nokinoki.",
+        nutrition: "Lia bilei oyo ezali na index glycemique ya nse (ndunda, mbuma ya cereale, madesu). Sangisa ntango nyonso ba proteines na ba fibres na ba glucides na yo.",
+        exercise: "Kosala sport miniti 30 mokolo na mokolo esalisaka mingi mpo na glycemie. Kotambola nokinoki ezali malamu. Tala taux na yo liboso mpe nsima ya sport.",
+        glucose_tracking: "Kosala yango mbala na mbala ezali fungola. Koma ba valeurs na yo na ntongo mpe nsima ya bilie. Glycemie ya malamu na ntongo ezali 70-100 mg/dL.",
+        mental_health: "Diabete ekoki kopesa stress. Stress ezali kobongola glycemie na yo. Kamata ntango ya kopema mpe lala malamu.",
+        medication: "Landa ordonnance na yo malamu. Soki obosani to ozali na ba effets secondaires, benga monganga na yo. Tala date ya insuline na yo.",
+        general: "Mbote ! Nazali GlucoBot. Nakoki kosalisa yo na toli ya bilie, sport, glycemie to bien-etre na yo.",
+        unknown: "Nayebi te ndenge ya kolimbola. Nakoki kosolola na yo mpo na: bilie, sport, glycemie, stress, ba nkisi. Meka koloba na maloba mosusu.",
+        error: "Bolimbisi, nazali na bobongisi. Kobosana te komela mai !"
+    },
+    sw: {
+        emergency: "Tahadhari: Kwa dalili kali (maumivu ya kifua, ugumu wa kupumua, jeraha la mguu, matatizo ya macho), tafadhali tembelea daktari au nenda hospitali haraka.",
+        nutrition: "Kula vyakula vyenye fahirisi ya glycemiki ya chini (mboga, nafaka nzima, kunde). Changanya protini na nyuzi na wanga wako kuzuia kupanda kwa sukari.",
+        exercise: "Kufanya mazoezi dakika 30 kwa siku kunasaidia sana kudhibiti sukari. Kutembea haraka ni bora. Angalia kiwango chako kabla na baada ya mazoezi.",
+        glucose_tracking: "Uthabiti ni muhimu. Andika viwango vyako asubuhi na masaa 2 baada ya kula. Sukari ya kawaida asubuhi ni 70-100 mg/dL.",
+        mental_health: "Kisukari inaweza kusababisha msongo. Msongo huathiri moja kwa moja sukari yako. Pumzika na ulale vizuri.",
+        medication: "Fuata dawa yako kwa uangalifu. Ikiwa umesahau au una madhara, wasiliana na daktari wako. Angalia tarehe ya muda wa insulini.",
+        general: "Habari! Mimi ni GlucoBot. Ninaweza kukusaidia na ushauri kuhusu lishe, mazoezi, sukari, au ustawi wako.",
+        unknown: "Sijaelewa vizuri. Ninaweza kuzungumza kuhusu: lishe, mazoezi, sukari, msongo, dawa. Tafadhali jaribu tena.",
+        error: "Samahani, niko katika matengenezo. Usisahau kunywa maji!"
+    },
+    tsh: {
+        emergency: "Dimuka : Bua maladi ya bunene (mpasi ya ntulu, dipama dia kupema, tshilonda tsha dikasa, mitungisi ya mesu), ndaku kudi muganga nokinoki.",
+        nutrition: "Dia bidia bia glycemiki ya panshi (matamba, bidia bia cereale, nyama ya mashi). Sangisha ba proteines na ba fibres na glucides yebe.",
+        exercise: "Kuenza sport miniti 30 dituku na dituku dikwasha bua glycemie. Kutambuka nokinoki kudi kuimpe. Tala taux yebe kumpala na nyima ya sport.",
+        glucose_tracking: "Kuenza bimpe mvua ne mvua nkudiangaja. Fumina ba valeurs yebe mu dinda ne nsima ya bidia. Glycemie ya buimpe mu dinda idi 70-100 mg/dL.",
+        mental_health: "Diabete udi mua kupeta stress. Stress udi ubongola glycemie yebe. Kamata diba dia kupemena ne lala bimpe.",
+        medication: "Londa ordonnance yebe bimpe. Bu ubosane anyi udi na ba effets secondaires, bikila muganga webe. Tala date ya insuline yebe.",
+        general: "Muoyo ! Ndi GlucoBot. Ndi mua kukwasha na malongesha a bidia, sport, glycemie anyi bien-etre yebe.",
+        unknown: "Tshiena mumanye mua kulondolola to. Ndi mua kuakula ne wewe bua: bidia, sport, glycemie, stress, nkisi. Meka kuamba mu njila yisatu.",
+        error: "Lumbuluisha, ndi mu bobongisi. Kubosana te kumena mai !"
+    },
+    kg: {
+        emergency: "Keba : Mpo na maladi ya makasi (mpasi ya ntulu, mpasi ya kupema, mpota na lokolo, mitungisi ya meso), kwenda na nganga to na lopitalo nokinoki.",
+        nutrition: "Dia bilei ya glycemiki ya nse (ndunda, bilei ya cereale, madesu). Sangisa ba proteines na ba fibres na glucides na nge.",
+        exercise: "Kusala sport miniti 30 lumbu na lumbu kusadisaka mingi mpo na glycemie. Kutambula nokinoki kuzali mbote. Tala taux na nge kumpala ye nsima ya sport.",
+        glucose_tracking: "Kusala yango mvua ne mvua kuzali fungola. Sonika ba valeurs na nge na nsuka ye nsima ya bilei. Glycemie ya mbote na nsuka kuzali 70-100 mg/dL.",
+        mental_health: "Diabete lenda kupesa stress. Stress kuzali kubadula glycemie na nge. Kamata ntangu ya kupemena ye lala mbote.",
+        medication: "Landa ordonnance na nge mbote. Kansi ubosane to uzali na ba effets secondaires, bikila nganga na nge. Tala date ya insuline na nge.",
+        general: "Mbote ! Mono nzali GlucoBot. Nzali lenda kusadisa nge na malongi ya bilei, sport, glycemie to bien-etre na nge.",
+        unknown: "Ke yazabi ve ndenge ya kulondolola. Nzali lenda kusolula na nge mpo na: bilei, sport, glycemie, stress, nkisi. Meka kulanda na ndinga mosusu.",
+        error: "Bolimbisi, nzali na bobongisi. Kubosana te kumela mamba !"
+    }
+};
+
+function getFallbackResponse(topic, lang) {
+    const langResponses = FALLBACK_RESPONSES[lang] || FALLBACK_RESPONSES.fr;
+    return langResponses[topic] || langResponses.unknown;
+}
+
+function getFallbackErrorMessage(lang) {
+    return (FALLBACK_RESPONSES[lang] || FALLBACK_RESPONSES.fr).error;
+}
+
+// ─── /chat ──────────────────────────────────────────────────────────
 router.post('/chat', async (req, res) => {
+    const lang = req.body.lang || 'fr';
+
     try {
-        const { message, context } = req.body;
+        const { message, history, patientContext } = req.body;
 
         if (!message) {
             return res.status(400).json({ error: "Message is required" });
@@ -16,25 +141,13 @@ router.post('/chat', async (req, res) => {
         let text = "";
 
         try {
-            // Attempt real AI generation
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const langName = LANG_NAMES[lang] || 'francais';
+            const systemPrompt = buildSystemPrompt(patientContext, langName);
+            const conversationCtx = buildConversationContext(history);
 
-            // Health-focused prompt
-            const prompt = `
-            Tu es GlucoBot, un assistant IA amical et utile pour l'application de gestion du diabète GlucoSoin.
-            Ton but est de répondre aux questions des patients sur le diabète, la santé et l'utilisation de l'application.
-            
-            Directives :
-            - Réponds TOUJOURS en français.
-            - Sois empathique, encourageant et clair.
-            - Donne des conseils de santé généraux mais conseille TOUJOURS de consulter un vrai médecin pour les décisions médicales.
-            - Garde les réponses concises (max 2-3 phrases sauf si on demande des détails).
-            - L'application s'appelle "GlucoSoin".
-    
-            Contexte Utilisateur (si disponible) : ${JSON.stringify(context || {})}
-            
-            Question Utilisateur : ${message}
-            `;
+            const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+            const prompt = `${systemPrompt}${conversationCtx}\n\nNouveau message du patient: ${message}`;
 
             const result = await model.generateContent(prompt);
             const response = await result.response;
@@ -42,86 +155,51 @@ router.post('/chat', async (req, res) => {
 
         } catch (aiError) {
             console.warn("Gemini API failed or key missing, using fallback.", aiError.message);
-            // Fallback rules for demo/no-key scenarios
-            // Robust Intent-Based Classification System
 
-            // 1. Define Topics and Keywords
+            // Keyword-based fallback (French keywords work across accented input)
             const topics = {
-                emergency: {
-                    keywords: ['mal', 'douleur', 'urgence', 'grave', 'sang', 'inconscient', 'poitrine', 'cœur', 'respirer', 'blessure', 'malaise', 'urgent', 'aide', 'hopital', 'pied', 'coupe', 'vision', 'flou'],
-                    response: "⚠️ **Attention** : Pour tout symptôme grave (douleur thoracique, difficulté à respirer, blessure au pied, troubles de la vision), consultez immédiatement un médecin ou allez aux urgences. Je ne suis qu'une IA."
-                },
-                nutrition: {
-                    keywords: ['manger', 'repas', 'dejeuner', 'diner', 'souper', 'fruit', 'sucre', 'glucide', 'pain', 'riz', 'regime', 'faim', 'poids', 'recette', 'viande', 'legume', 'boire', 'eau', 'alcool', 'diet', 'nourriture'],
-                    response: "🍎 **Nutrition** : Privilégiez les aliments à index glycémique bas (légumes, céréales complètes, légumineuses). Associez toujours des protéines et des fibres à vos glucides pour éviter les pics de glycémie. N'oubliez pas de bien vous hydrater !"
-                },
-                exercise: {
-                    keywords: ['sport', 'marcher', 'courir', 'exercice', 'activite', 'forme', 'gym', 'muscle', 'bouger', 'promener', 'velo', 'fitness'],
-                    response: "🏃 **Activité Physique** : Bouger 30 minutes par jour aide énormément à réguler la glycémie. La marche rapide est idéale. Pensez à vérifier votre taux avant et après l'effort, et ayez toujours du sucre sur vous en cas d'hypo."
-                },
-                glucose_tracking: {
-                    keywords: ['taux', 'glycemie', 'mesure', 'test', 'doigt', 'capteur', 'haut', 'bas', 'hypo', 'hyper', 'controle', 'resultat', 'normale', 'sucre', 'glucose'],
-                    response: "🩸 **Suivi Glycémique** : La régularité est la clé. Notez vos valeurs à jeun et 2h après les repas. Une glycémie normale à jeun se situe généralement entre 70 et 100 mg/dL, mais suivez les objectifs fixés par votre médecin."
-                },
-                mental_health: {
-                    keywords: ['fatigue', 'stress', 'peur', 'anxiete', 'triste', 'deprime', 'seul', 'moral', 'dormir', 'insomnie', 'epuise', 'nerveux', 'dodo', 'sommeil'],
-                    response: "🧠 **Bien-être** : Le diabète peut être stressant. Le stress influence directement votre glycémie (souvent à la hausse). Prenez du temps pour vous détendre, dormez suffisamment et n'hésitez pas à en parler à vos proches ou à un psychologue."
-                },
-                medication: {
-                    keywords: ['medicament', 'insuline', 'piqure', 'comprime', 'pilule', 'traitement', 'dose', 'oubli', 'ordonnance', 'pharmacie', 'metformine'],
-                    response: "💊 **Traitement** : Respectez scrupuleusement votre ordonnance. En cas d'oubli ou d'effets secondaires, ne modifiez pas votre traitement seul : contactez votre médecin ou pharmacien. Vérifiez toujours la date de péremption de votre insuline."
-                },
-                general: {
-                    keywords: ['bonjour', 'salut', 'hello', 'ca va', 'aide', 'quoi', 'comment', 'qui'],
-                    response: "👋 Bonjour ! Je suis GlucoBot. Je peux vous aider avec des conseils sur l'alimentation, le sport, la gestion de la glycémie ou votre bien-être. Posez-moi une question précise !"
-                }
+                emergency: ['mal', 'douleur', 'urgence', 'grave', 'sang', 'inconscient', 'poitrine', 'coeur', 'respirer', 'blessure', 'malaise', 'urgent', 'aide', 'hopital', 'pied', 'coupe', 'vision', 'flou'],
+                nutrition: ['manger', 'repas', 'dejeuner', 'diner', 'souper', 'fruit', 'sucre', 'glucide', 'pain', 'riz', 'regime', 'faim', 'poids', 'recette', 'viande', 'legume', 'boire', 'eau', 'alcool', 'diet', 'nourriture'],
+                exercise: ['sport', 'marcher', 'courir', 'exercice', 'activite', 'forme', 'gym', 'muscle', 'bouger', 'promener', 'velo', 'fitness'],
+                glucose_tracking: ['taux', 'glycemie', 'mesure', 'test', 'doigt', 'capteur', 'haut', 'bas', 'hypo', 'hyper', 'controle', 'resultat', 'normale', 'sucre', 'glucose'],
+                mental_health: ['fatigue', 'stress', 'peur', 'anxiete', 'triste', 'deprime', 'seul', 'moral', 'dormir', 'insomnie', 'epuise', 'nerveux', 'dodo', 'sommeil'],
+                medication: ['medicament', 'insuline', 'piqure', 'comprime', 'pilule', 'traitement', 'dose', 'oubli', 'ordonnance', 'pharmacie', 'metformine'],
+                general: ['bonjour', 'salut', 'hello', 'ca va', 'aide', 'quoi', 'comment', 'qui', 'mbote', 'habari', 'muoyo']
             };
 
-            // 2. Score the Message
             const normalizedMsg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             let bestTopic = 'unknown';
             let maxScore = 0;
 
-            for (const [key, category] of Object.entries(topics)) {
+            for (const [key, keywords] of Object.entries(topics)) {
                 let score = 0;
-                category.keywords.forEach(word => {
+                keywords.forEach(word => {
                     if (normalizedMsg.includes(word)) score += 1;
                 });
-
-                // Weight Emergency higher to be safe
                 if (key === 'emergency') score *= 1.5;
-
                 if (score > maxScore) {
                     maxScore = score;
                     bestTopic = key;
                 }
             }
 
-            // 3. Select Response
-            if (maxScore > 0) {
-                text = topics[bestTopic].response;
-                // Add specific context if emergency or unknown
-                if (bestTopic === 'emergency') {
-                    text += " \n\n(Note: Détection de mots-clés liés à une urgence ou une douleur.)";
-                }
-            } else {
-                text = "Je ne suis pas sûr de comprendre. Je peux parler de :\n- 🍎 Nutrition\n- 🏃 Sport\n- 🩸 Glycémie\n- 🧠 Stress\n- 💊 Médicaments\n\nEssayez de reformuler avec des mots simples.";
-            }
+            text = maxScore > 0
+                ? getFallbackResponse(bestTopic, lang)
+                : getFallbackResponse('unknown', lang);
         }
 
         res.json({ reply: text });
 
     } catch (error) {
         console.error("AI Error:", error);
-        // Even in outer catch, try to return something friendly
-        res.json({ reply: "Désolé, je suis en maintenance pour l'instant. Mais n'oubliez pas de bien vous hydrater !" });
+        res.json({ reply: getFallbackErrorMessage(lang) });
     }
 });
 
 
 router.post('/forecast', async (req, res) => {
     try {
-        const { history, type } = req.body; // history is array of { date, value }, type is 'Glucose', etc.
+        const { history, type } = req.body;
 
         if (!history || history.length < 3) {
             return res.status(400).json({ error: "Need at least 3 data points for forecasting" });
@@ -130,7 +208,7 @@ router.post('/forecast', async (req, res) => {
         let data;
 
         try {
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
             const prompt = `
             Act as a medical data analyst. Analyze the following ${type} readings from a diabetes patient.
@@ -158,14 +236,12 @@ router.post('/forecast', async (req, res) => {
             const response = await result.response;
             let text = response.text();
 
-            // Cleanup markdown if present
             text = text.replace(/```json/g, '').replace(/```/g, '').trim();
             data = JSON.parse(text);
 
         } catch (aiError) {
             console.warn("Gemini Forecast failed, using fallback.", aiError.message);
 
-            // Simple fallback calculation
             const lastVal = history[history.length - 1].value;
             let trend = "stable";
             if (history.length > 1) {
@@ -174,7 +250,6 @@ router.post('/forecast', async (req, res) => {
                 else if (lastVal < prevVal * 0.95) trend = "falling";
             }
 
-            // Generate 3 mock days
             const lastDate = new Date(history[history.length - 1].date);
             const predictions = [];
             for (let i = 1; i <= 3; i++) {
@@ -184,7 +259,6 @@ router.post('/forecast', async (req, res) => {
                 let nextVal = lastVal;
                 if (trend === 'rising') nextVal += (i * 2);
                 if (trend === 'falling') nextVal -= (i * 2);
-                // Add some noise
                 nextVal = Math.round(nextVal + (Math.random() * 4 - 2));
 
                 predictions.push({
@@ -199,7 +273,7 @@ router.post('/forecast', async (req, res) => {
                 predictions: predictions,
                 insight: trend === 'stable'
                     ? "Vos taux semblent stables. Continuez ainsi."
-                    : "Légère variation détectée, surveillez votre régime."
+                    : "Legere variation detectee, surveillez votre regime."
             };
         }
 
@@ -217,7 +291,6 @@ router.post('/forecast', async (req, res) => {
 
 /**
  * Comprehensive Health Analysis
- * Analyzes all patient vitals, prescriptions, and conditions to provide personalized insights
  */
 router.post('/analyze-health', async (req, res) => {
     try {
@@ -230,9 +303,8 @@ router.post('/analyze-health', async (req, res) => {
         let analysis;
 
         try {
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-            // Prepare comprehensive data summary
             const dataContext = {
                 patient: {
                     type: patientData.type || 'Type 2',
@@ -298,12 +370,12 @@ router.post('/analyze-health', async (req, res) => {
                     "urgentConcerns": ["concern1"] or []
                 },
                 "insights": [
-                    { "type": "positive|warning|info", "title": "Titre court", "message": "Explication détaillée" }
+                    { "type": "positive|warning|info", "title": "Titre court", "message": "Explication detaillee" }
                 ],
                 "recommendations": [
-                    { "category": "nutrition|exercise|medication|monitoring", "priority": "high|medium|low", "action": "Action spécifique à prendre" }
+                    { "category": "nutrition|exercise|medication|monitoring", "priority": "high|medium|low", "action": "Action specifique a prendre" }
                 ],
-                "nextSteps": ["Étape 1", "Étape 2", "Étape 3"]
+                "nextSteps": ["Etape 1", "Etape 2", "Etape 3"]
             }
             `;
 
@@ -311,24 +383,20 @@ router.post('/analyze-health', async (req, res) => {
             const response = await result.response;
             let text = response.text();
 
-            // Cleanup markdown if present
             text = text.replace(/```json/g, '').replace(/```/g, '').trim();
             analysis = JSON.parse(text);
 
         } catch (aiError) {
             console.warn("Gemini Health Analysis failed, using fallback.", aiError.message);
 
-            // Intelligent fallback analysis
             const glucoseReadings = vitals.readings?.filter(v => v.category === 'Glucose' || !v.category) || [];
             const bpReadings = vitals.readings?.filter(v => v.category === 'Blood Pressure') || [];
             const weightReadings = vitals.readings?.filter(v => v.category === 'Weight') || [];
 
-            // Calculate glucose average
             const avgGlucose = glucoseReadings.length > 0
                 ? Math.round(glucoseReadings.reduce((sum, r) => sum + (r.glucose || r.value || 0), 0) / glucoseReadings.length)
                 : 0;
 
-            // Assess glucose status
             let glucoseStatus = "stable";
             let glucoseConcern = "low";
             if (avgGlucose > 180) {
@@ -341,7 +409,6 @@ router.post('/analyze-health', async (req, res) => {
                 glucoseConcern = "medium";
             }
 
-            // Determine overall status
             let overallStatus = "good";
             let healthScore = 75;
             if (glucoseConcern === "high") {
@@ -355,62 +422,59 @@ router.post('/analyze-health', async (req, res) => {
                 healthScore = 90;
             }
 
-            // Generate insights
             const insights = [];
             if (avgGlucose > 180) {
                 insights.push({
                     type: "warning",
-                    title: "Glycémie élevée détectée",
-                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL, ce qui est au-dessus de la cible. Il est important de consulter votre médecin.`
+                    title: "Glycemie elevee detectee",
+                    message: `Votre glycemie moyenne est de ${avgGlucose} mg/dL, ce qui est au-dessus de la cible. Il est important de consulter votre medecin.`
                 });
             } else if (avgGlucose < 70) {
                 insights.push({
                     type: "warning",
-                    title: "Hypoglycémie détectée",
-                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL. Attention aux hypoglycémies. Consultez votre médecin pour ajuster votre traitement.`
+                    title: "Hypoglycemie detectee",
+                    message: `Votre glycemie moyenne est de ${avgGlucose} mg/dL. Attention aux hypoglycemies. Consultez votre medecin pour ajuster votre traitement.`
                 });
             } else if (avgGlucose >= 80 && avgGlucose <= 120) {
                 insights.push({
                     type: "positive",
-                    title: "Excellent contrôle glycémique",
-                    message: `Votre glycémie moyenne de ${avgGlucose} mg/dL est dans la cible optimale. Continuez comme ça !`
+                    title: "Excellent controle glycemique",
+                    message: `Votre glycemie moyenne de ${avgGlucose} mg/dL est dans la cible optimale. Continuez comme ca !`
                 });
             } else {
                 insights.push({
                     type: "info",
-                    title: "Contrôle glycémique acceptable",
-                    message: `Votre glycémie moyenne est de ${avgGlucose} mg/dL. Quelques ajustements pourraient l'améliorer.`
+                    title: "Controle glycemique acceptable",
+                    message: `Votre glycemie moyenne est de ${avgGlucose} mg/dL. Quelques ajustements pourraient l'ameliorer.`
                 });
             }
 
-            // Add weight insight if data available
             if (weightReadings.length > 1) {
                 const weightChange = weightReadings[weightReadings.length - 1].value - weightReadings[0].value;
                 if (Math.abs(weightChange) > 2) {
                     insights.push({
                         type: "info",
-                        title: weightChange > 0 ? "Prise de poids détectée" : "Perte de poids détectée",
-                        message: `Vous avez ${weightChange > 0 ? 'gagné' : 'perdu'} ${Math.abs(weightChange).toFixed(1)} kg sur la période analysée.`
+                        title: weightChange > 0 ? "Prise de poids detectee" : "Perte de poids detectee",
+                        message: `Vous avez ${weightChange > 0 ? 'gagne' : 'perdu'} ${Math.abs(weightChange).toFixed(1)} kg sur la periode analysee.`
                     });
                 }
             }
 
-            // Generate recommendations
             const recommendations = [
                 {
                     category: "monitoring",
                     priority: "high",
-                    action: "Mesurez votre glycémie à jeun chaque matin et 2h après les repas principaux"
+                    action: "Mesurez votre glycemie a jeun chaque matin et 2h apres les repas principaux"
                 },
                 {
                     category: "nutrition",
                     priority: "high",
-                    action: "Privilégiez les légumes, protéines maigres et céréales complètes. Limitez les sucres rapides."
+                    action: "Privilegiez les legumes, proteines maigres et cereales completes. Limitez les sucres rapides."
                 },
                 {
                     category: "exercise",
                     priority: "medium",
-                    action: "Marchez 30 minutes par jour, de préférence après les repas pour stabiliser la glycémie"
+                    action: "Marchez 30 minutes par jour, de preference apres les repas pour stabiliser la glycemie"
                 }
             ];
 
@@ -418,7 +482,7 @@ router.post('/analyze-health', async (req, res) => {
                 recommendations.push({
                     category: "medication",
                     priority: "high",
-                    action: "Discutez avec votre médecin d'un possible ajustement de votre traitement"
+                    action: "Discutez avec votre medecin d'un possible ajustement de votre traitement"
                 });
             }
 
@@ -451,15 +515,15 @@ router.post('/analyze-health', async (req, res) => {
                 },
                 riskAssessment: {
                     level: glucoseConcern === "high" ? "high" : glucoseConcern === "medium" ? "moderate" : "low",
-                    factors: avgGlucose > 180 ? ["Glycémie chroniquement élevée", "Risque de complications"] : [],
-                    urgentConcerns: avgGlucose > 250 || avgGlucose < 60 ? ["Consulter un médecin rapidement"] : []
+                    factors: avgGlucose > 180 ? ["Glycemie chroniquement elevee", "Risque de complications"] : [],
+                    urgentConcerns: avgGlucose > 250 || avgGlucose < 60 ? ["Consulter un medecin rapidement"] : []
                 },
                 insights,
                 recommendations,
                 nextSteps: [
-                    "Continuez à enregistrer vos mesures quotidiennement",
-                    "Suivez les recommandations nutritionnelles personnalisées",
-                    "Planifiez votre prochain rendez-vous médical si nécessaire"
+                    "Continuez a enregistrer vos mesures quotidiennement",
+                    "Suivez les recommandations nutritionnelles personnalisees",
+                    "Planifiez votre prochain rendez-vous medical si necessaire"
                 ]
             };
         }

@@ -105,14 +105,14 @@ const AddDoctor = () => {
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
             <Header />
-            <div className="container mx-auto px-4 py-12">
+            <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12">
                 <div className="max-w-2xl mx-auto">
-                    <h1 className="text-3xl font-serif font-bold mb-8 flex items-center gap-2">
+                    <h1 className="text-2xl sm:text-3xl font-serif font-bold mb-6 sm:mb-8 flex items-center gap-2">
                         <UserPlus className="text-primary" /> Ajouter un Spécialiste
                     </h1>
 
                     <Card>
-                        <CardContent className="p-8">
+                        <CardContent className="p-4 sm:p-8">
                             {addDoctorMutation.isError && (
                                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
                                     <strong>Erreur:</strong> {addDoctorMutation.error?.message || 'Une erreur est survenue'}

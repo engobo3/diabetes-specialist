@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import BetaBadge from '../components/ui/BetaBadge';
 
 const PaymentTerminal = () => {
-    const { doctorProfile } = useAuth();
+    const { doctorProfile, currentUser } = useAuth();
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -15,12 +15,16 @@ const PaymentTerminal = () => {
     // Fetch patients for search
     const { data: patients = [] } = useQuery({
         queryKey: ['patients', doctorProfile?.id],
-        queryFn: () => {
-            if (!doctorProfile?.id) return [];
-            return fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`)
-                .then(res => res.json());
+        queryFn: async () => {
+            if (!doctorProfile?.id || !currentUser) return [];
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch patients');
+            return res.json();
         },
-        enabled: !!doctorProfile?.id
+        enabled: !!doctorProfile?.id && !!currentUser
     });
 
     const filteredPatients = patients.filter(p =>
@@ -39,15 +43,15 @@ const PaymentTerminal = () => {
     };
 
     return (
-        <div className="p-6 max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="p-3 sm:p-6 max-w-4xl mx-auto space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        Terminal de Paiement (POS) <BetaBadge />
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        Terminal de Paiement <span className="hidden sm:inline">(POS)</span> <BetaBadge />
                     </h1>
-                    <p className="text-gray-500">Encaissement pour consultations et services</p>
+                    <p className="text-gray-500 text-sm sm:text-base">Encaissement pour consultations et services</p>
                 </div>
-                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium w-fit">
                     Mode: Virtuel
                 </div>
             </div>
