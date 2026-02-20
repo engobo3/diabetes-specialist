@@ -1,8 +1,42 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // Patient documents: only the owning patient, any doctor, or admin
+    match /patients/{patientId}/{allPaths=**} {
+      allow read: if request.auth != null && (
+        request.auth.uid == patientId ||
+        exists(/databases/(default)/documents/doctors/$(request.auth.uid)) ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+      allow write: if request.auth != null && (
+        request.auth.uid == patientId ||
+        exists(/databases/(default)/documents/doctors/$(request.auth.uid)) ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Doctor profile photos: public read, owner or admin write
+    match /doctors/{doctorId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        request.auth.uid == doctorId ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Dossier exports (PDFs): only authenticated users
+    match /exports/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        exists(/databases/(default)/documents/doctors/$(request.auth.uid)) ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Default deny everything else
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

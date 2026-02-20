@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middleware/authMiddleware');
-const { getPatients, getPatientById, getPatientByEmail, getCaregiverPatients, getPatientVitals, addPatientVital, createPatient, updatePatient, deletePatient, getDocuments, addDocument, addDoctorToPatient, removeDoctorFromPatient, verifyActivationCode, resendActivationCode, activatePatient } = require('../controllers/patientController');
+const { getPatients, getPatientById, getPatientByEmail, getCaregiverPatients, getPatientVitals, addPatientVital, deletePatientVital, createPatient, updatePatient, deletePatient, getDocuments, addDocument, addDoctorToPatient, removeDoctorFromPatient, verifyActivationCode, resendActivationCode, activatePatient } = require('../controllers/patientController');
 
 // PUBLIC activation routes (no auth required)
 router.post('/activate/verify', verifyActivationCode);
@@ -20,6 +20,7 @@ router.delete('/:id', deletePatient);
 router.get('/:id', getPatientById);
 router.get('/:id/vitals', getPatientVitals);
 router.post('/:id/vitals', addPatientVital);
+router.delete('/:id/vitals/:vitalId', deletePatientVital);
 router.get('/:id/documents', getDocuments);
 router.post('/:id/documents', addDocument);
 router.post('/:id/doctors', addDoctorToPatient);

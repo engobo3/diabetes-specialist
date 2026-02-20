@@ -4,6 +4,7 @@ import { Phone, Search, Menu, User, MapPin, X, Globe } from 'lucide-react';
 import Button from './ui/Button';
 import BetaBadge from './ui/BetaBadge';
 import RoleSwitcher from './RoleSwitcher';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslations } from '../translations';
@@ -96,8 +97,9 @@ const Header = () => {
                         {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                     </button>
 
-                    {/* Role Switcher (for users with multiple roles) */}
+                    {/* Role Switcher + Notifications (for users with multiple roles) */}
                     <div className="hidden lg:flex items-center gap-3">
+                        {currentUser && <NotificationBell />}
                         {currentUser && userRoles && userRoles.length > 1 && <RoleSwitcher />}
 
                         {/* Primary Action - routes based on role */}
@@ -129,6 +131,12 @@ const Header = () => {
                         <Link to="/find-doctor" className="block text-gray-700 hover:text-primary py-3 font-medium min-h-[44px]" onClick={() => setMobileMenuOpen(false)}>
                             {t.findDoctor}
                         </Link>
+                        {currentUser && (
+                            <div className="border-t border-gray-100 pt-3 flex items-center gap-3">
+                                <NotificationBell />
+                                <span className="text-sm text-gray-600">Notifications</span>
+                            </div>
+                        )}
                         {currentUser && userRoles && userRoles.length > 1 && (
                             <div className="border-t border-gray-100 pt-3">
                                 <RoleSwitcher />

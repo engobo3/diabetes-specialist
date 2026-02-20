@@ -60,6 +60,35 @@ class VitalRepository extends BaseRepository {
         }
     }
 
+    async delete(patientId, vitalId) {
+        try {
+            if (db) {
+                try {
+                    const docRef = db.collection('patients')
+                        .doc(String(patientId))
+                        .collection('vitals')
+                        .doc(String(vitalId));
+
+                    const doc = await docRef.get();
+                    if (!doc.exists) {
+                        return null;
+                    }
+
+                    await docRef.delete();
+                    return { id: vitalId, deleted: true };
+                } catch (fsError) {
+                    console.error('Firestore Error in delete (Fallback to Local):', fsError.message);
+                    return this._deleteLocal(patientId, vitalId);
+                }
+            } else {
+                return this._deleteLocal(patientId, vitalId);
+            }
+        } catch (error) {
+            console.error('VitalRepository delete error:', error);
+            throw error;
+        }
+    }
+
     _getLocalByPatientId(patientId) {
         const allVitals = this._readLocal();
         const patientVitals = allVitals.find(v => v.patientId === parseInt(patientId));
@@ -86,6 +115,18 @@ class VitalRepository extends BaseRepository {
 
         this._writeLocal(allVitals);
         return vitalData;
+    }
+    _deleteLocal(patientId, vitalId) {
+        let allVitals = this._readLocal();
+        const patientVitals = allVitals.find(v => v.patientId === parseInt(patientId));
+        if (!patientVitals) return null;
+
+        const index = patientVitals.readings.findIndex((r, i) => (r.id || String(i)) === String(vitalId));
+        if (index === -1) return null;
+
+        patientVitals.readings.splice(index, 1);
+        this._writeLocal(allVitals);
+        return { id: vitalId, deleted: true };
     }
 }
 

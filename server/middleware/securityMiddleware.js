@@ -52,8 +52,8 @@ const securityHeaders = (req, res, next) => {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     
-    // Content Security Policy
-    res.setHeader('Content-Security-Policy', "default-src 'self'");
+    // CSP for API responses (JSON, not HTML). The SPA gets its CSP from Firebase Hosting headers.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
     
     // Referrer Policy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -147,7 +147,7 @@ const sanitizeInput = (req, res, next) => {
                 .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove script tags and content
                 .replace(/<iframe[^>]*>.*?<\/iframe>/gis, '') // Remove iframe tags
                 .replace(/javascript:/gi, '') // Remove javascript: protocol
-                .replace(/on\w+\s*=/gi, '') // Remove inline event handlers
+                .replace(/\bon\w+\s*=\s*["']/gi, '') // Remove inline event handlers (onclick="...", etc.)
                 .replace(/<embed[^>]*>/gi, '') // Remove embed tags
                 .replace(/<object[^>]*>.*?<\/object>/gis, ''); // Remove object tags
         }
@@ -184,9 +184,14 @@ const sanitizeInput = (req, res, next) => {
  * Validate Content-Type for POST/PUT/PATCH
  */
 const validateContentType = (req, res, next) => {
+    // Skip for webhook endpoints (third-party callbacks may use different content types)
+    if (req.path === '/api/payments/webhook') {
+        return next();
+    }
+
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
         const contentType = req.headers['content-type'];
-        
+
         if (!contentType || !contentType.includes('application/json')) {
             return res.status(415).json({
                 error: 'Unsupported Media Type',
@@ -194,7 +199,7 @@ const validateContentType = (req, res, next) => {
             });
         }
     }
-    
+
     next();
 };
 

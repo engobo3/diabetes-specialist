@@ -7,10 +7,10 @@ const caregiverController = require('../controllers/caregiverController');
 router.post('/invite', verifyToken, caregiverController.inviteCaregiver);
 
 // Specific routes MUST come before parameterized routes
-router.get('/invitations/pending', caregiverController.getPendingInvitations);
+router.get('/invitations/pending', verifyToken, caregiverController.getPendingInvitations);
 router.get('/invitations/pending-approval', verifyToken, caregiverController.getPendingApprovalsForDoctor);
 router.get('/invitations/patient/:patientId', verifyToken, caregiverController.getPatientInvitations);
-router.get('/invitations/:token', caregiverController.getInvitationByToken);
+router.get('/invitations/:token', verifyToken, caregiverController.getInvitationByToken);
 
 // Invitation actions
 router.post('/invitations/:id/accept', verifyToken, caregiverController.acceptInvitation);

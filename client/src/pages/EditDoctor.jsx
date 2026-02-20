@@ -4,7 +4,7 @@ import Header from '../components/Header';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
-import { UserCog, Save, ArrowLeft } from 'lucide-react';
+import { UserCog, Save, ArrowLeft, Clock, Plus, Trash2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -33,6 +33,19 @@ const EditDoctor = () => {
         image: ''
     });
 
+    const DAYS = [
+        { key: 'monday', label: 'Lundi' },
+        { key: 'tuesday', label: 'Mardi' },
+        { key: 'wednesday', label: 'Mercredi' },
+        { key: 'thursday', label: 'Jeudi' },
+        { key: 'friday', label: 'Vendredi' },
+        { key: 'saturday', label: 'Samedi' },
+        { key: 'sunday', label: 'Dimanche' }
+    ];
+
+    const [availability, setAvailability] = useState({});
+    const [slotDuration, setSlotDuration] = useState(30);
+
     useEffect(() => {
         if (doctor) {
             setFormData({
@@ -46,8 +59,50 @@ const EditDoctor = () => {
                 languages: doctor.languages ? doctor.languages.join(', ') : '',
                 image: doctor.image || ''
             });
+            setAvailability(doctor.availability || {});
+            setSlotDuration(doctor.slotDuration || 30);
         }
     }, [doctor]);
+
+    const toggleDay = (dayKey) => {
+        setAvailability(prev => {
+            const copy = { ...prev };
+            if (copy[dayKey]) {
+                delete copy[dayKey];
+            } else {
+                copy[dayKey] = [{ start: '08:00', end: '12:00' }];
+            }
+            return copy;
+        });
+    };
+
+    const addRange = (dayKey) => {
+        setAvailability(prev => ({
+            ...prev,
+            [dayKey]: [...(prev[dayKey] || []), { start: '14:00', end: '17:00' }]
+        }));
+    };
+
+    const removeRange = (dayKey, index) => {
+        setAvailability(prev => {
+            const ranges = [...prev[dayKey]];
+            ranges.splice(index, 1);
+            if (ranges.length === 0) {
+                const copy = { ...prev };
+                delete copy[dayKey];
+                return copy;
+            }
+            return { ...prev, [dayKey]: ranges };
+        });
+    };
+
+    const updateRange = (dayKey, index, field, value) => {
+        setAvailability(prev => {
+            const ranges = [...prev[dayKey]];
+            ranges[index] = { ...ranges[index], [field]: value };
+            return { ...prev, [dayKey]: ranges };
+        });
+    };
 
     const updateDoctorMutation = useMutation({
         mutationFn: async (updatedDoctor) => {
@@ -99,7 +154,9 @@ const EditDoctor = () => {
                 email: formData.email,
                 phone: formData.phone,
                 address: formData.address
-            }
+            },
+            availability,
+            slotDuration
         };
 
         delete doctorData.email;
@@ -148,6 +205,77 @@ const EditDoctor = () => {
 
                                 <Input label="Formation (séparée par des virgules)" name="education" value={formData.education} onChange={handleChange} />
                                 <Input label="Langues (séparées par des virgules)" name="languages" value={formData.languages} onChange={handleChange} />
+
+                                {/* Availability Editor */}
+                                <div className="border-t pt-6 mt-6">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                                        <Clock size={20} className="text-primary" /> Disponibilités
+                                    </h3>
+
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Durée du créneau</label>
+                                        <select
+                                            value={slotDuration}
+                                            onChange={e => setSlotDuration(Number(e.target.value))}
+                                            className="flex h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        >
+                                            <option value={15}>15 minutes</option>
+                                            <option value={20}>20 minutes</option>
+                                            <option value={30}>30 minutes</option>
+                                            <option value={45}>45 minutes</option>
+                                            <option value={60}>60 minutes</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {DAYS.map(({ key, label }) => {
+                                            const isActive = !!availability[key];
+                                            const ranges = availability[key] || [];
+                                            return (
+                                                <div key={key} className={`p-3 rounded-lg border ${isActive ? 'border-primary/30 bg-primary/5' : 'border-gray-200 bg-gray-50'}`}>
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="flex items-center gap-2 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isActive}
+                                                                onChange={() => toggleDay(key)}
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                            />
+                                                            <span className={`font-medium text-sm ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>{label}</span>
+                                                        </label>
+                                                        {isActive && (
+                                                            <button type="button" onClick={() => addRange(key)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1">
+                                                                <Plus size={14} /> Ajouter plage
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {isActive && ranges.map((range, i) => (
+                                                        <div key={i} className="flex items-center gap-2 mt-2 ml-6">
+                                                            <input
+                                                                type="time"
+                                                                value={range.start}
+                                                                onChange={e => updateRange(key, i, 'start', e.target.value)}
+                                                                className="h-8 rounded border border-gray-300 px-2 text-sm focus:ring-primary focus:border-primary"
+                                                            />
+                                                            <span className="text-gray-500 text-sm">à</span>
+                                                            <input
+                                                                type="time"
+                                                                value={range.end}
+                                                                onChange={e => updateRange(key, i, 'end', e.target.value)}
+                                                                className="h-8 rounded border border-gray-300 px-2 text-sm focus:ring-primary focus:border-primary"
+                                                            />
+                                                            {ranges.length > 1 && (
+                                                                <button type="button" onClick={() => removeRange(key, i)} className="text-red-400 hover:text-red-600">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Photo du Médecin</label>

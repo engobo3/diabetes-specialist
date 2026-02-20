@@ -6,6 +6,7 @@
 
 const flexpayService = require('../services/flexpayService');
 const auditLogger = require('../services/auditLogger');
+const { safeErrorMessage } = require('../utils/safeError');
 
 /**
  * Initiate mobile money payment
@@ -40,7 +41,7 @@ exports.initiateMobileMoneyPayment = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Payment initiation failed',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -88,7 +89,7 @@ exports.initiateCardPayment = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Card payment failed',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -126,7 +127,7 @@ exports.initiateCashPayment = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Cash payment recording failed',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -150,7 +151,7 @@ exports.checkPaymentStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to check payment status',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -181,7 +182,7 @@ exports.getUserTransactions = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch transactions',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -224,7 +225,7 @@ exports.confirmCashPayment = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to confirm payment',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -274,7 +275,7 @@ exports.processRefund = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to process refund',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -330,7 +331,7 @@ exports.handleWebhook = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Webhook processing failed',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -357,7 +358,7 @@ exports.getPatientTransactions = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch patient transactions',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -391,7 +392,7 @@ exports.getProviders = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch providers',
-            message: error.message
+            message: safeErrorMessage(error)
         });
     }
 };

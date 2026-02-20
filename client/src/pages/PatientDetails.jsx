@@ -7,6 +7,7 @@ import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MedicalDossier from '../components/MedicalDossier';
 import FootRiskPanel from '../components/FootRiskPanel';
+import { resolveIcon, findVitalType, getDefaultVitalType, buildPayload, getVitalLabelFr, getFieldLabelFr, DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
 
 const PatientDetails = () => {
     const { id } = useParams();
@@ -15,7 +16,8 @@ const PatientDetails = () => {
     const [patient, setPatient] = useState(null);
     const [vitals, setVitals] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [selectedVitalType, setSelectedVitalType] = useState('Glucose'); // 'Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'
+    const [specialtyVitalTypes, setSpecialtyVitalTypes] = useState(DEFAULT_VITAL_TYPES);
+    const [selectedVitalType, setSelectedVitalType] = useState('Glucose');
     const [forecast, setForecast] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
 
@@ -75,53 +77,55 @@ const PatientDetails = () => {
         }
     }, [id, currentUser]);
 
+    // Fetch specialty config once patient is loaded
+    useEffect(() => {
+        if (!patient?.doctorSpecialty || !currentUser) return;
+        const fetchSpecialtyConfig = async () => {
+            try {
+                const token = await currentUser.getIdToken();
+                const res = await fetch(
+                    `${import.meta.env.VITE_API_URL}/api/specialties/resolve/${encodeURIComponent(patient.doctorSpecialty)}`,
+                    { headers: { 'Authorization': `Bearer ${token}` } }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.vitalTypes?.length) {
+                        setSpecialtyVitalTypes(data.vitalTypes);
+                        setSelectedVitalType(data.vitalTypes[0].key);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching specialty config:', err);
+            }
+        };
+        fetchSpecialtyConfig();
+    }, [patient?.doctorSpecialty, currentUser]);
+
     const handleAddVital = async (e) => {
         e.preventDefault();
-        const formData = new FormData(e.target);
+        const formEl = new FormData(e.target);
+        const vtConfig = findVitalType(specialtyVitalTypes, selectedVitalType);
 
-        const baseVital = {
-            date: formData.get('date'),
-            type: selectedVitalType,
-        };
-
-        let specificData = {};
-        if (selectedVitalType === 'Glucose') {
-            const val = parseInt(formData.get('value'));
-            specificData = {
-                category: 'Glucose',
-                subtype: formData.get('subtype'),
-                value: val,
-                glucose: val
-            };
-        } else if (selectedVitalType === 'Blood Pressure') {
-            const sys = parseInt(formData.get('systolic'));
-            const dia = parseInt(formData.get('diastolic'));
-            specificData = {
-                category: 'Blood Pressure',
-                systolic: sys,
-                diastolic: dia,
-                value: `${sys}/${dia}`
-            };
-        } else if (selectedVitalType === 'Weight') {
-            specificData = {
-                category: 'Weight',
-                value: parseFloat(formData.get('value'))
-            };
-        } else if (selectedVitalType === 'Heart Rate') {
-            specificData = {
-                category: 'Heart Rate',
-                value: parseInt(formData.get('value'))
-            };
+        // Build form data object from form element
+        const formObj = { date: formEl.get('date'), subtype: formEl.get('subtype') };
+        if (vtConfig?.chartType === 'dual') {
+            for (const field of vtConfig.formFields) {
+                formObj[field] = formEl.get(field);
+            }
+        } else {
+            const fieldKey = vtConfig?.formFields?.[0] || 'value';
+            formObj[fieldKey] = formEl.get('value');
+            formObj.value = formEl.get('value');
         }
 
-        const newVital = { ...baseVital, ...specificData };
+        const payload = buildPayload(vtConfig, formObj);
 
         try {
             const token = await currentUser.getIdToken();
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(newVital),
+                body: JSON.stringify(payload),
             });
 
             if (response.ok) {
@@ -133,6 +137,25 @@ const PatientDetails = () => {
         } catch (error) {
             console.error('Error adding vital:', error);
             alert('Erreur lors de l\'ajout de la lecture');
+        }
+    };
+
+    const handleDeleteVital = async (vitalId) => {
+        if (!window.confirm('Supprimer cette mesure ? Cette action est irréversible.')) return;
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals/${vitalId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Delete failed');
+            setVitals(prev => ({
+                ...prev,
+                readings: prev.readings.filter(r => r.id !== vitalId)
+            }));
+        } catch (error) {
+            console.error('Error deleting vital:', error);
+            alert('Erreur lors de la suppression.');
         }
     };
 
@@ -350,16 +373,22 @@ const PatientDetails = () => {
     if (!patient) return <div className="p-8 text-center text-red-500">Patient non trouvé</div>;
 
     // Filter vitals for chart and list - use category first, fall back to type field
+    const selectedVtConfig = findVitalType(specialtyVitalTypes, selectedVitalType);
     const filteredVitals = vitals?.readings
         ?.filter(v => {
             const vitalType = v.category || v.type;
             return vitalType === selectedVitalType || (!vitalType && selectedVitalType === 'Glucose');
         })
-        ?.map(v => ({
-            ...v,
-            // Normalize glucose field so chart dataKey always finds a value
-            glucose: v.glucose ?? (selectedVitalType === 'Glucose' ? (typeof v.value === 'number' ? v.value : parseFloat(v.value)) : undefined),
-        }))
+        ?.map(v => {
+            const mapped = { ...v };
+            if (selectedVtConfig?.chartType === 'single') {
+                const key = selectedVtConfig.chartDataKey;
+                if (mapped[key] == null && mapped.value != null) {
+                    mapped[key] = typeof mapped.value === 'number' ? mapped.value : parseFloat(mapped.value);
+                }
+            }
+            return mapped;
+        })
         ?.sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
 
     const chartData = forecast ? [...filteredVitals, ...forecast.predictions] : [...filteredVitals];
@@ -397,13 +426,9 @@ const PatientDetails = () => {
     };
 
     const getVitalConfig = (type) => {
-        switch (type) {
-            case 'Glucose': return { color: '#3B82F6', unit: 'mg/dL', icon: Droplets };
-            case 'Blood Pressure': return { color: '#EF4444', unit: 'mmHg', icon: Activity };
-            case 'Weight': return { color: '#10B981', unit: 'kg', icon: Scale };
-            case 'Heart Rate': return { color: '#F59E0B', unit: 'bpm', icon: Heart };
-            default: return { color: '#6B7280', unit: '', icon: Activity };
-        }
+        const vt = findVitalType(specialtyVitalTypes, type);
+        if (vt) return { color: vt.color, unit: vt.unit, icon: resolveIcon(vt.iconName) };
+        return { color: '#6B7280', unit: '', icon: Activity };
     };
 
     const config = getVitalConfig(selectedVitalType);
@@ -532,19 +557,19 @@ const PatientDetails = () => {
 
                 {/* Tabs */}
                 <div className="flex space-x-1 bg-white p-1 rounded-lg border border-gray-200 mb-6 w-full sm:w-fit overflow-x-auto print:hidden">
-                    {['Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'].map(type => (
+                    {specialtyVitalTypes.map(vt => (
                         <button
-                            key={type}
+                            key={vt.key}
                             onClick={() => {
-                                setSelectedVitalType(type);
+                                setSelectedVitalType(vt.key);
                                 setForecast(null);
                             }}
-                            className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === type
+                            className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === vt.key
                                 ? 'bg-blue-50 text-blue-700 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                 }`}
                         >
-                            {type === 'Blood Pressure' ? 'Tension' : type === 'Heart Rate' ? 'Rythme' : type === 'Weight' ? 'Poids' : type}
+                            {getVitalLabelFr(vt.key)}
                         </button>
                     ))}
                     <button
@@ -736,6 +761,7 @@ const PatientDetails = () => {
                                 medicalRecords={medicalRecords}
                                 documents={documents}
                                 appointments={appointments}
+                                specialtyVitalTypes={specialtyVitalTypes}
                             />
                         ) : selectedVitalType === 'FootRisk' ? (
                             <FootRiskPanel patientId={id} patient={patient} />
@@ -780,35 +806,42 @@ const PatientDetails = () => {
                                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }}
                                                         formatter={(value, name) => [`${value} ${config.unit}`, name === 'systolic' ? 'Systolique' : name === 'diastolic' ? 'Diastolique' : selectedVitalType]}
                                                     />
-                                                    {selectedVitalType === 'Blood Pressure' ? (
-                                                        <>
-                                                            <Legend verticalAlign="top" height={36} />
-                                                            <Line type="monotone" dataKey="systolic" stroke={config.color} strokeWidth={3} dot={{ r: 5, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Systolique">
-                                                                <LabelList dataKey="systolic" position="top" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: config.color }} />
+                                                    {(() => {
+                                                        if (selectedVtConfig?.chartType === 'dual') {
+                                                            const keys = selectedVtConfig.chartDataKey;
+                                                            return (
+                                                                <>
+                                                                    <Legend verticalAlign="top" height={36} />
+                                                                    <Line type="monotone" dataKey={keys[0]} stroke={config.color} strokeWidth={3} dot={{ r: 5, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Systolique">
+                                                                        <LabelList dataKey={keys[0]} position="top" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: config.color }} />
+                                                                    </Line>
+                                                                    <Line type="monotone" dataKey={keys[1]} stroke="#818CF8" strokeWidth={3} dot={{ r: 5, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Diastolique">
+                                                                        <LabelList dataKey={keys[1]} position="bottom" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: '#818CF8' }} />
+                                                                    </Line>
+                                                                </>
+                                                            );
+                                                        }
+                                                        const dataKey = selectedVtConfig?.chartDataKey || 'value';
+                                                        return (
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey={dataKey}
+                                                                stroke={config.color}
+                                                                strokeWidth={3}
+                                                                dot={(props) => {
+                                                                    const { cx, cy, payload } = props;
+                                                                    if (payload.type === 'predicted') {
+                                                                        return <circle cx={cx} cy={cy} r={5} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
+                                                                    }
+                                                                    return <circle cx={cx} cy={cy} r={5} fill={config.color} stroke="white" strokeWidth={2} />;
+                                                                }}
+                                                                activeDot={{ r: 7 }}
+                                                                strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
+                                                            >
+                                                                <LabelList dataKey={dataKey} position="top" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: config.color }} />
                                                             </Line>
-                                                            <Line type="monotone" dataKey="diastolic" stroke="#818CF8" strokeWidth={3} dot={{ r: 5, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name="Diastolique">
-                                                                <LabelList dataKey="diastolic" position="bottom" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: '#818CF8' }} />
-                                                            </Line>
-                                                        </>
-                                                    ) : (
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'}
-                                                            stroke={config.color}
-                                                            strokeWidth={3}
-                                                            dot={(props) => {
-                                                                const { cx, cy, payload } = props;
-                                                                if (payload.type === 'predicted') {
-                                                                    return <circle cx={cx} cy={cy} r={5} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
-                                                                }
-                                                                return <circle cx={cx} cy={cy} r={5} fill={config.color} stroke="white" strokeWidth={2} />;
-                                                            }}
-                                                            activeDot={{ r: 7 }}
-                                                            strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
-                                                        >
-                                                            <LabelList dataKey={selectedVitalType === 'Glucose' ? 'glucose' : 'value'} position="top" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: config.color }} />
-                                                        </Line>
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </LineChart>
                                             </ResponsiveContainer>
                                         ) : (
@@ -827,25 +860,35 @@ const PatientDetails = () => {
                                                 <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Date</th>
                                                 <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Détail</th>
                                                 <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm">Valeur ({config.unit})</th>
+                                                <th className="p-2 sm:p-4 font-semibold text-gray-600 text-xs sm:text-sm w-12"></th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredVitals.slice().reverse().map((reading, index) => (
-                                                <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-slate-50">
+                                            {filteredVitals.slice().reverse().map((reading) => (
+                                                <tr key={reading.id} className="border-b border-gray-100 last:border-0 hover:bg-slate-50">
                                                     <td className="p-2 sm:p-4 text-gray-700 text-xs sm:text-sm">{reading.date}</td>
                                                     <td className="p-2 sm:p-4 text-gray-500 text-xs sm:text-sm">
-                                                        {selectedVitalType === 'Glucose' ? (reading.subtype || reading.type || 'Standard') : '-'}
+                                                        {selectedVtConfig?.extras?.subtypes ? (reading.subtype || reading.type || 'Standard') : '-'}
                                                     </td>
                                                     <td className="p-2 sm:p-4 font-medium text-gray-900 text-xs sm:text-sm">
-                                                        {selectedVitalType === 'Blood Pressure'
-                                                            ? `${reading.systolic}/${reading.diastolic}`
-                                                            : (reading.value || reading.glucose)}
+                                                        {selectedVtConfig?.chartType === 'dual'
+                                                            ? `${reading[selectedVtConfig.chartDataKey[0]]}/${reading[selectedVtConfig.chartDataKey[1]]}`
+                                                            : (reading[selectedVtConfig?.chartDataKey] || reading.value)}
+                                                    </td>
+                                                    <td className="p-2 sm:p-4">
+                                                        <button
+                                                            onClick={() => handleDeleteVital(reading.id)}
+                                                            className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                                                            title="Supprimer cette mesure"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
                                             {filteredVitals.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="3" className="p-8 text-center text-gray-500 text-sm">Aucune donnée trouvée.</td>
+                                                    <td colSpan="4" className="p-8 text-center text-gray-500 text-sm">Aucune donnée trouvée.</td>
                                                 </tr>
                                             )}
                                         </tbody>
@@ -951,53 +994,39 @@ const PatientDetails = () => {
                                         <input type="date" name="date" required className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" defaultValue={new Date().toISOString().split('T')[0]} />
                                     </div>
 
-                                    {selectedVitalType === 'Glucose' && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Moment</label>
-                                                <select name="subtype" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
-                                                    <option value="Fasting">À Jeun</option>
-                                                    <option value="Post-Prandial">Post-Prandial</option>
-                                                    <option value="Random">Aléatoire</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Glucose (mg/dL)</label>
-                                                <input type="number" name="value" required min="0" max="1000" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="120" />
-                                            </div>
-                                        </>
+                                    {/* Subtype selector (e.g., Glucose fasting/post-prandial) */}
+                                    {selectedVtConfig?.extras?.subtypes && (
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Moment</label>
+                                            <select name="subtype" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                                {selectedVtConfig.extras.subtypes.map(st => (
+                                                    <option key={st} value={st}>{st === 'Fasting' ? 'À Jeun' : st === 'Post-Prandial' ? 'Post-Prandial' : st}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     )}
 
-                                    {selectedVitalType === 'Blood Pressure' && (
+                                    {/* Dynamic form fields from config */}
+                                    {selectedVtConfig?.chartType === 'dual' ? (
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Systolique</label>
-                                                <input type="number" name="systolic" required min="50" max="300" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="120" />
+                                            {selectedVtConfig.formFields.map(field => (
+                                                <div key={field}>
+                                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{getFieldLabelFr(field)}</label>
+                                                    <input type="number" name={field} required min="30" max="300" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder={field === 'systolic' ? '120' : '80'} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        selectedVtConfig?.formFields?.map(field => (
+                                            <div key={field}>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{getFieldLabelFr(field)}</label>
+                                                <input type="number" step={field === 'weight' || field === 'temperature' ? '0.1' : '1'} name="value" required min="0" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="" />
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Diastolique</label>
-                                                <input type="number" name="diastolic" required min="30" max="200" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="80" />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {selectedVitalType === 'Weight' && (
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Poids (kg)</label>
-                                            <input type="number" step="0.1" name="value" required min="0" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="75.5" />
-                                        </div>
-                                    )}
-
-                                    {selectedVitalType === 'Heart Rate' && (
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">BPM</label>
-                                            <input type="number" name="value" required min="0" max="300" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" placeholder="72" />
-                                        </div>
+                                        ))
                                     )}
 
                                     <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                        Enregistrer {selectedVitalType === 'Blood Pressure' ? 'la tension' : selectedVitalType === 'Heart Rate' ? 'le rythme' : selectedVitalType === 'Weight' ? 'le poids' : 'la mesure'}
-                                    </button>
+                                        Enregistrer {getVitalLabelFr(selectedVitalType)}</button>
                                 </form>
                             )}
                         </div>

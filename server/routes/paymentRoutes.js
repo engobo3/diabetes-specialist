@@ -10,7 +10,25 @@ const paymentController = require('../controllers/paymentController');
 const verifyToken = require('../middleware/authMiddleware');
 const { rateLimit } = require('../middleware/securityMiddleware');
 
-// Apply authentication to all payment routes
+/**
+ * @route   POST /api/payments/webhook
+ * @desc    Handle FlexPay webhook callbacks
+ * @access  Public (called by FlexPay) — must be ABOVE router.use(verifyToken)
+ */
+router.post('/webhook', (req, res, next) => {
+    const secret = process.env.FLEXPAY_WEBHOOK_SECRET;
+    if (!secret) {
+        console.warn('FLEXPAY_WEBHOOK_SECRET not set — webhook accepted without verification');
+        return next();
+    }
+    const provided = req.headers['x-webhook-secret'] || req.query.secret;
+    if (provided !== secret) {
+        return res.status(403).json({ error: 'Invalid webhook secret' });
+    }
+    next();
+}, paymentController.handleWebhook);
+
+// Apply authentication to all remaining payment routes
 router.use(verifyToken);
 
 // Apply stricter rate limiting for payment endpoints (100 requests per 15 minutes)
@@ -85,12 +103,5 @@ router.post('/:transactionId/confirm', paymentController.confirmCashPayment);
  * @body    { reason }
  */
 router.post('/:transactionId/refund', paymentController.processRefund);
-
-/**
- * @route   POST /api/payments/webhook
- * @desc    Handle FlexPay webhook callbacks
- * @access  Public (called by FlexPay)
- */
-router.post('/webhook', paymentController.handleWebhook);
 
 module.exports = router;

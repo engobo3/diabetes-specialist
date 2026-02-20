@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslations } from '../translations';
 import Button from './ui/Button';
+import { DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
 
-const AiAssistant = ({ patient, vitals, prescriptions }) => {
+const AiAssistant = ({ patient, vitals, prescriptions, specialtyVitalTypes = DEFAULT_VITAL_TYPES }) => {
     const { lang } = useLanguage();
     const t = getTranslations('aiAssistant', lang);
 
@@ -23,31 +24,33 @@ const AiAssistant = ({ patient, vitals, prescriptions }) => {
         setMessages([{ role: 'assistant', text: t.greeting }]);
     }, [lang]);
 
-    // Build patient context from props
+    // Build patient context from props - driven by specialty config
     const patientContext = useMemo(() => {
         if (!patient) return null;
 
         const readings = vitals?.readings || [];
 
-        // Last 5 glucose readings (use category || type fallback)
-        const recentGlucose = readings
-            .filter(v => (v.category || v.type) === 'Glucose' || (!v.category && !v.type))
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5)
-            .map(v => ({ date: v.date, value: v.glucose ?? v.value }));
+        // Build recent readings for each vital type in the specialty config
+        const recentVitals = {};
+        for (const vt of specialtyVitalTypes) {
+            const filtered = readings
+                .filter(v => (v.category || v.type) === vt.key || (!v.category && !v.type && vt.key === 'Glucose'))
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5);
 
-        // Last 3 BP readings
-        const recentBP = readings
-            .filter(v => (v.category || v.type) === 'Blood Pressure')
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 3)
-            .map(v => ({ date: v.date, systolic: v.systolic, diastolic: v.diastolic }));
-
-        // Latest weight
-        const weightReadings = readings
-            .filter(v => (v.category || v.type) === 'Weight')
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
-        const latestWeight = weightReadings.length > 0 ? weightReadings[0].value : null;
+            if (vt.chartType === 'dual') {
+                recentVitals[vt.key] = filtered.map(v => ({
+                    date: v.date,
+                    [vt.chartDataKey[0]]: v[vt.chartDataKey[0]],
+                    [vt.chartDataKey[1]]: v[vt.chartDataKey[1]]
+                }));
+            } else {
+                recentVitals[vt.key] = filtered.map(v => ({
+                    date: v.date,
+                    value: v[vt.chartDataKey] ?? v.value
+                }));
+            }
+        }
 
         // Active medications
         const medications = (prescriptions || []).map(p => ({
@@ -61,12 +64,10 @@ const AiAssistant = ({ patient, vitals, prescriptions }) => {
             type: patient.type || patient.diabetesType,
             conditions: patient.conditions || [],
             allergies: patient.allergies || [],
-            recentGlucose,
-            recentBP,
+            recentVitals,
             medications,
-            latestWeight,
         };
-    }, [patient, vitals, prescriptions]);
+    }, [patient, vitals, prescriptions, specialtyVitalTypes]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

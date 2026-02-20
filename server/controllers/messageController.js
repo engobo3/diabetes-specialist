@@ -1,4 +1,5 @@
 const { getMessages, getConversation, saveMessage } = require('../services/database');
+const { safeErrorMessage } = require('../utils/safeError');
 
 /**
  * Get all messages for a contact
@@ -35,7 +36,7 @@ const getConversationMessages = async (req, res) => {
         console.error("Error fetching messages:", error);
         res.status(500).json({ 
             error: 'Failed to fetch messages',
-            message: error.message 
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -93,7 +94,7 @@ const sendMessage = async (req, res) => {
         console.error("Error sending message:", error);
         res.status(500).json({ 
             error: 'Failed to send message',
-            message: error.message 
+            message: safeErrorMessage(error)
         });
     }
 };
@@ -123,7 +124,7 @@ const markMessageAsRead = async (req, res) => {
         console.error("Error marking message as read:", error);
         res.status(500).json({ 
             error: 'Failed to mark message as read',
-            message: error.message 
+            message: safeErrorMessage(error)
         });
     }
 };

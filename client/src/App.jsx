@@ -1,7 +1,8 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { onForegroundMessage } from './firebase';
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -80,6 +81,20 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+    // Listen for foreground push messages and show toast
+    useEffect(() => {
+        const unsubscribe = onForegroundMessage((payload) => {
+            const { title, body } = payload.notification || {};
+            if (title) {
+                toast(
+                    `${title}${body ? '\n' + body : ''}`,
+                    { icon: '\uD83D\uDD14', duration: 6000 }
+                );
+            }
+        });
+        return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+    }, []);
+
     return (
         <PersistQueryClientProvider
             client={queryClient}

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth } from "../firebase";
+import { auth, requestNotificationPermission } from "../firebase";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 const AuthContext = createContext();
@@ -186,6 +186,24 @@ export const AuthProvider = ({ children }) => {
                         setUserRoles(['doctor']);
                         setActiveRole('doctor');
                     }
+
+                    // Request push notification permission and register token (non-blocking)
+                    requestNotificationPermission().then(async (fcmToken) => {
+                        if (fcmToken) {
+                            try {
+                                await fetch(`${apiUrl}/api/notifications/register-token`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({ token: fcmToken })
+                                });
+                            } catch (err) {
+                                console.warn('Failed to register FCM token:', err);
+                            }
+                        }
+                    }).catch(() => {});
                 } catch (error) {
                     console.error("Error fetching user roles", error);
                     setUserRole('doctor');

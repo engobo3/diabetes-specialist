@@ -100,6 +100,10 @@ const addVital = async (patientId, vitalData) => {
     return vitalRepo.add(patientId, vitalData);
 };
 
+const deleteVital = async (patientId, vitalId) => {
+    return vitalRepo.delete(patientId, vitalId);
+};
+
 // --- Payment Operations ---
 
 const getPayments = async (patientId) => {
@@ -149,6 +153,7 @@ module.exports = {
     migrateToFirestore,
     getVitals,
     addVital,
+    deleteVital,
     getPayments,
     createPayment,
     getPatientDocuments,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Printer, ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { buildUnitMap, DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
 
 const SectionHeader = ({ number, title, count }) => (
     <div className="border-b-2 border-gray-800 pb-1 mb-4 mt-8 first:mt-0 print:break-inside-avoid">
@@ -15,17 +16,13 @@ const EmptyRow = ({ colSpan = 5, text = 'None recorded' }) => (
     <tr><td colSpan={colSpan} className="p-3 text-center text-gray-400 italic text-sm border border-gray-300">{text}</td></tr>
 );
 
-const unitMap = {
-    'Glucose': 'mg/dL',
-    'Blood Pressure': 'mmHg',
-    'Weight': 'kg',
-    'Heart Rate': 'bpm',
-};
+// Default unit map; overridden by specialty config when available
+const defaultUnitMap = buildUnitMap(DEFAULT_VITAL_TYPES);
 
-const formatVitalValue = (v) => {
+const formatVitalValue = (v, unitMapRef = defaultUnitMap) => {
     const type = v.category || v.type;
     if (type === 'Blood Pressure') return `${v.systolic}/${v.diastolic} mmHg`;
-    return `${v.value} ${unitMap[type] || v.unit || ''}`;
+    return `${v.value} ${unitMapRef[type] || v.unit || ''}`;
 };
 
 const MedicalDossier = ({
@@ -35,7 +32,9 @@ const MedicalDossier = ({
     medicalRecords = [],
     documents = [],
     appointments = [],
+    specialtyVitalTypes = DEFAULT_VITAL_TYPES,
 }) => {
+    const unitMap = buildUnitMap(specialtyVitalTypes.length ? specialtyVitalTypes : DEFAULT_VITAL_TYPES);
     const { currentUser } = useAuth();
     const [showAllVitals, setShowAllVitals] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -74,9 +73,9 @@ const MedicalDossier = ({
     const clinicalNotes = medicalRecords.filter(r => r.type === 'clinical_note').sort((a, b) => new Date(b.date) - new Date(a.date));
     const referrals = medicalRecords.filter(r => r.type === 'referral').sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Latest vitals by type
-    const vitalTypes = ['Glucose', 'Blood Pressure', 'Weight', 'Heart Rate'];
-    const latestVitals = vitalTypes.map(type => {
+    // Latest vitals by type - driven by specialty config
+    const vitalTypeKeys = specialtyVitalTypes.map(vt => vt.key);
+    const latestVitals = vitalTypeKeys.map(type => {
         const filtered = (vitals || []).filter(v => (v.category || v.type) === type);
         const sorted = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
         return { type, latest: sorted[0] || null, count: sorted.length };
@@ -272,7 +271,7 @@ const MedicalDossier = ({
                     {latestVitals.map(({ type, latest, count }) => (
                         <tr key={type}>
                             <td className="p-2 border border-gray-300 font-medium">{type}</td>
-                            <td className="p-2 border border-gray-300">{latest ? formatVitalValue(latest) : 'N/A'}</td>
+                            <td className="p-2 border border-gray-300">{latest ? formatVitalValue(latest, unitMap) : 'N/A'}</td>
                             <td className="p-2 border border-gray-300">{latest?.date || '-'}</td>
                             <td className="p-2 border border-gray-300 text-center">{count}</td>
                         </tr>
@@ -302,7 +301,7 @@ const MedicalDossier = ({
                                 <tr key={v.id || i}>
                                     <td className="p-2 border border-gray-300">{v.date}</td>
                                     <td className="p-2 border border-gray-300">{v.category || v.type}</td>
-                                    <td className="p-2 border border-gray-300">{formatVitalValue(v)}</td>
+                                    <td className="p-2 border border-gray-300">{formatVitalValue(v, unitMap)}</td>
                                     <td className="p-2 border border-gray-300 text-gray-500">{v.subtype || '-'}</td>
                                 </tr>
                             ))}
@@ -326,7 +325,7 @@ const MedicalDossier = ({
                                         <tr key={v.id || `extra-${i}`}>
                                             <td className="p-2 border border-gray-300 w-28">{v.date}</td>
                                             <td className="p-2 border border-gray-300">{v.category || v.type}</td>
-                                            <td className="p-2 border border-gray-300">{formatVitalValue(v)}</td>
+                                            <td className="p-2 border border-gray-300">{formatVitalValue(v, unitMap)}</td>
                                             <td className="p-2 border border-gray-300 text-gray-500">{v.subtype || '-'}</td>
                                         </tr>
                                     ))}

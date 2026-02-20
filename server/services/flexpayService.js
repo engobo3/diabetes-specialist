@@ -119,7 +119,7 @@ class FlexPayService {
                 phone: phoneNumber,
                 provider,
                 reference: transaction.id,
-                callback_url: `${process.env.API_BASE_URL}/api/payments/webhook`,
+                callback_url: `${process.env.API_BASE_URL}/api/payments/webhook${process.env.FLEXPAY_WEBHOOK_SECRET ? '?secret=' + process.env.FLEXPAY_WEBHOOK_SECRET : ''}`,
                 description: description || `Payment for GlucoSoin services`
             };
 
@@ -219,7 +219,7 @@ class FlexPayService {
                     holder_name: cardHolderName
                 },
                 reference: transaction.id,
-                callback_url: `${process.env.API_BASE_URL}/api/payments/webhook`,
+                callback_url: `${process.env.API_BASE_URL}/api/payments/webhook${process.env.FLEXPAY_WEBHOOK_SECRET ? '?secret=' + process.env.FLEXPAY_WEBHOOK_SECRET : ''}`,
                 description: description || `Payment for GlucoSoin services`
             };
 

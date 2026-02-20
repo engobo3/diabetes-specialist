@@ -1,4 +1,4 @@
-const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, createPatient, updatePatient, deletePatient, getPatientsByDoctorId, migrateToFirestore, getVitals, addVital, getPatientDocuments, addPatientDocument } = require('../services/database');
+const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, createPatient, updatePatient, deletePatient, getPatientsByDoctorId, migrateToFirestore, getVitals, addVital, deleteVital, getPatientDocuments, addPatientDocument } = require('../services/database');
 const { validatePatient } = require('../utils/validation');
 const { generateActivationCode, generateCodeExpiry } = require('../utils/activationCode');
 const emailService = require('../services/emailNotificationService');
@@ -98,6 +98,19 @@ const addPatientVital = async (req, res) => {
         res.status(201).json(newVital);
     } catch (error) {
         res.status(500).json({ message: 'Error adding vital' });
+    }
+};
+
+const deletePatientVital = async (req, res) => {
+    try {
+        const result = await deleteVital(req.params.id, req.params.vitalId);
+        if (!result) {
+            return res.status(404).json({ message: 'Vital not found' });
+        }
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error deleting vital:', error);
+        res.status(500).json({ message: 'Error deleting vital' });
     }
 };
 
@@ -375,6 +388,7 @@ module.exports = {
     getCaregiverPatients: getCaregiverPatientsController,
     getPatientVitals,
     addPatientVital,
+    deletePatientVital,
     createPatient: createNewPatient,
     updatePatient: updateExistingPatient,
     deletePatient: deleteExistingPatient,

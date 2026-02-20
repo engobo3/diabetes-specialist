@@ -1,4 +1,5 @@
 const caregiverService = require('../services/caregiverService');
+const { safeErrorMessage } = require('../utils/safeError');
 
 /**
  * POST /api/caregivers/invite
@@ -32,7 +33,7 @@ const inviteCaregiver = async (req, res) => {
     res.status(201).json(invitation);
   } catch (error) {
     console.error('Error creating invitation:', error);
-    res.status(400).json({ message: error.message || 'Error creating invitation' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error creating invitation') });
   }
 };
 
@@ -130,7 +131,7 @@ const acceptInvitation = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error accepting invitation:', error);
-    res.status(400).json({ message: error.message || 'Error accepting invitation' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error accepting invitation') });
   }
 };
 
@@ -145,7 +146,7 @@ const rejectInvitation = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error rejecting invitation:', error);
-    res.status(400).json({ message: error.message || 'Error rejecting invitation' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error rejecting invitation') });
   }
 };
 
@@ -163,7 +164,7 @@ const cancelInvitation = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error cancelling invitation:', error);
-    res.status(400).json({ message: error.message || 'Error cancelling invitation' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error cancelling invitation') });
   }
 };
 
@@ -187,7 +188,7 @@ const approveInvitation = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error approving invitation:', error);
-    res.status(400).json({ message: error.message || 'Error approving invitation' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error approving invitation') });
   }
 };
 
@@ -235,7 +236,7 @@ const updateCaregiverPermissions = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error updating permissions:', error);
-    res.status(400).json({ message: error.message || 'Error updating permissions' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error updating permissions') });
   }
 };
 
@@ -256,7 +257,7 @@ const removeCaregiver = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error removing caregiver:', error);
-    res.status(400).json({ message: error.message || 'Error removing caregiver' });
+    res.status(400).json({ message: safeErrorMessage(error, 'Error removing caregiver') });
   }
 };
 

@@ -1,5 +1,6 @@
 const { db } = require('../config/firebase');
 const { validateDoctor } = require('../utils/validation');
+const { getAppointments } = require('../services/database');
 const fs = require('fs');
 const path = require('path');
 
@@ -202,11 +203,86 @@ const deleteDoctor = async (req, res) => {
     }
 };
 
+const getAvailableSlots = async (req, res) => {
+    try {
+        const doctorId = req.params.id;
+        const { date } = req.query;
+
+        if (!date) {
+            return res.status(400).json({ message: 'Date query parameter is required (YYYY-MM-DD)' });
+        }
+
+        // Fetch doctor to get availability + slotDuration
+        let doctorData = null;
+        const docRef = db.collection('doctors').doc(doctorId);
+        const docShot = await docRef.get();
+
+        if (docShot.exists) {
+            doctorData = docShot.data();
+        } else {
+            // Legacy fallback
+            const snapshot = await db.collection('doctors').where('id', '==', parseInt(doctorId)).limit(1).get();
+            if (!snapshot.empty) {
+                doctorData = snapshot.docs[0].data();
+            }
+        }
+
+        if (!doctorData) {
+            return res.status(404).json({ message: 'Doctor not found' });
+        }
+
+        const availability = doctorData.availability || {};
+        const slotDuration = doctorData.slotDuration || 30;
+
+        // Determine day-of-week from date
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dateObj = new Date(date + 'T00:00:00');
+        const dayOfWeek = dayNames[dateObj.getDay()];
+
+        const dayRanges = availability[dayOfWeek];
+        if (!dayRanges || dayRanges.length === 0) {
+            return res.json({ slots: [], slotDuration, date, message: 'Médecin non disponible ce jour' });
+        }
+
+        // Generate all possible slots from time ranges
+        const allSlots = [];
+        for (const range of dayRanges) {
+            const [startH, startM] = range.start.split(':').map(Number);
+            const [endH, endM] = range.end.split(':').map(Number);
+            let currentMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
+
+            while (currentMinutes + slotDuration <= endMinutes) {
+                const h = String(Math.floor(currentMinutes / 60)).padStart(2, '0');
+                const m = String(currentMinutes % 60).padStart(2, '0');
+                allSlots.push(`${h}:${m}`);
+                currentMinutes += slotDuration;
+            }
+        }
+
+        // Fetch existing appointments for this doctor on this date
+        const appointments = await getAppointments(doctorId);
+        const activeStatuses = ['pending', 'confirmed', 'Scheduled'];
+        const bookedTimes = appointments
+            .filter(a => a.date === date && activeStatuses.includes(a.status))
+            .map(a => a.time);
+
+        // Filter out booked slots
+        const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+
+        res.json({ slots: availableSlots, slotDuration, date });
+    } catch (error) {
+        console.error('Error getting available slots:', error);
+        res.status(500).json({ message: 'Error retrieving available slots' });
+    }
+};
+
 module.exports = {
     getDoctors,
     getDoctorById,
     addDoctor,
     updateDoctor,
     deleteDoctor,
-    lookupDoctorByEmail
+    lookupDoctorByEmail,
+    getAvailableSlots
 };

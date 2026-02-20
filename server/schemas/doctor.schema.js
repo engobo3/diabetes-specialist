@@ -1,5 +1,10 @@
 const { z } = require('zod');
 
+const TimeRangeSchema = z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, "Format HH:MM requis"),
+    end: z.string().regex(/^\d{2}:\d{2}$/, "Format HH:MM requis")
+});
+
 const DoctorSchema = z.object({
     id: z.union([z.string(), z.number()]).optional(),
     name: z.string().min(1, "Name is required"),
@@ -19,6 +24,13 @@ const DoctorSchema = z.object({
 
     city: z.string().min(1, "City is required"),
     role: z.string().optional(), // 'doctor', 'admin'
+
+    // Availability schedule (weekly recurring)
+    availability: z.record(
+        z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']),
+        z.array(TimeRangeSchema)
+    ).optional(),
+    slotDuration: z.number().min(10).max(120).optional(), // minutes, default 30
 });
 
 module.exports = { DoctorSchema };

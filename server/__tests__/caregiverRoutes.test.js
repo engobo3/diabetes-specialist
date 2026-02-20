@@ -86,36 +86,40 @@ describe('Caregiver Routes', () => {
   });
 
   describe('GET /api/caregivers/invitations/:token', () => {
-    it('should be public (no auth required)', async () => {
+    it('should require authentication', async () => {
       const res = await request(app)
         .get('/api/caregivers/invitations/sometoken123');
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should return invitation details with auth', async () => {
+      const res = await request(app)
+        .get('/api/caregivers/invitations/sometoken123')
+        .set('Authorization', 'Bearer token');
 
       expect(res.statusCode).toBe(200);
       expect(caregiverController.getInvitationByToken).toHaveBeenCalled();
-    });
-
-    it('should return invitation details', async () => {
-      const res = await request(app)
-        .get('/api/caregivers/invitations/sometoken123');
-
       expect(res.body.patientName).toBe('Jane Doe');
       expect(res.body.caregiverEmail).toBe('caregiver@example.com');
     });
   });
 
   describe('GET /api/caregivers/invitations/pending', () => {
-    it('should be public (no auth required)', async () => {
+    it('should require authentication', async () => {
       const res = await request(app)
         .get('/api/caregivers/invitations/pending?email=test@example.com');
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should return invitations for email with auth', async () => {
+      const res = await request(app)
+        .get('/api/caregivers/invitations/pending?email=test@example.com')
+        .set('Authorization', 'Bearer token');
 
       expect(res.statusCode).toBe(200);
       expect(caregiverController.getPendingInvitations).toHaveBeenCalled();
-    });
-
-    it('should return invitations for email', async () => {
-      const res = await request(app)
-        .get('/api/caregivers/invitations/pending?email=test@example.com');
-
       expect(res.body).toHaveLength(1);
       expect(res.body[0].caregiverEmail).toBe('test@example.com');
     });
@@ -142,7 +146,8 @@ describe('Caregiver Routes', () => {
   describe('POST /api/caregivers/invitations/:id/accept', () => {
     it('should require authentication', async () => {
       const res = await request(app)
-        .post('/api/caregivers/invitations/inv123/accept');
+        .post('/api/caregivers/invitations/inv123/accept')
+        .send({});
 
       expect(res.statusCode).toBe(403);
     });
@@ -221,7 +226,8 @@ describe('Caregiver Routes', () => {
   describe('Route Ordering (specific before parameterized)', () => {
     it('should match /invitations/pending before /:token', async () => {
       const res = await request(app)
-        .get('/api/caregivers/invitations/pending?email=test@example.com');
+        .get('/api/caregivers/invitations/pending?email=test@example.com')
+        .set('Authorization', 'Bearer token');
 
       expect(res.statusCode).toBe(200);
       // Should call getPendingInvitations, not getInvitationByToken
@@ -231,7 +237,8 @@ describe('Caregiver Routes', () => {
 
     it('should match /invitations/:token for other values', async () => {
       const res = await request(app)
-        .get('/api/caregivers/invitations/abc123token');
+        .get('/api/caregivers/invitations/abc123token')
+        .set('Authorization', 'Bearer token');
 
       expect(res.statusCode).toBe(200);
       expect(caregiverController.getInvitationByToken).toHaveBeenCalled();
