@@ -21,17 +21,32 @@ const createNewAppointment = async (req, res) => {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        // Conflict check: ensure no existing active appointment for same doctor+date+time
+        // Atomic conflict check + creation using a slot lock document
         if (doctorId && date && time) {
-            const existing = await getAppointments(doctorId);
-            const activeStatuses = ['pending', 'confirmed', 'Scheduled'];
-            const conflict = existing.find(a =>
-                a.date === date &&
-                a.time === time &&
-                activeStatuses.includes(a.status)
-            );
-            if (conflict) {
-                return res.status(409).json({ message: 'Ce créneau est déjà réservé. Veuillez en choisir un autre.' });
+            const slotId = `${doctorId}_${date}_${time}`;
+            const slotRef = db.collection('appointment_slots').doc(slotId);
+
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const slotDoc = await transaction.get(slotRef);
+                    if (slotDoc.exists) {
+                        throw new Error('SLOT_CONFLICT');
+                    }
+
+                    // Reserve the slot
+                    transaction.set(slotRef, {
+                        doctorId,
+                        date,
+                        time,
+                        patientId,
+                        reservedAt: new Date().toISOString()
+                    });
+                });
+            } catch (txError) {
+                if (txError.message === 'SLOT_CONFLICT') {
+                    return res.status(409).json({ message: 'Ce créneau est déjà réservé. Veuillez en choisir un autre.' });
+                }
+                throw txError;
             }
         }
 

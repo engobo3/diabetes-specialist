@@ -29,6 +29,7 @@ const Specialties = lazy(() => import('./pages/Specialties'));
 const About = lazy(() => import('./pages/About'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation'));
 const PopulationHealth = lazy(() => import('./pages/PopulationHealth'));
+const DoctorCalendar = lazy(() => import('./pages/DoctorCalendar'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -131,6 +132,7 @@ function App() {
                             <Route path="/edit-patient/:id" element={<ProtectedRoute><EditPatient /></ProtectedRoute>} />
                             <Route path="/patients/:id" element={<ProtectedRoute><PatientDetails /></ProtectedRoute>} />
                             <Route path="/analytics" element={<ProtectedRoute><PopulationHealth /></ProtectedRoute>} />
+                            <Route path="/doctor-calendar" element={<ProtectedRoute><DoctorCalendar /></ProtectedRoute>} />
                         </Routes>
                     </Suspense>
                 </Router>

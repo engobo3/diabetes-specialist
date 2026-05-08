@@ -21,15 +21,21 @@ jest.mock('../controllers/messageController', () => ({
 jest.mock('../controllers/patientController', () => ({
     updatePatient: jest.fn((req, res) => res.json({ id: req.params.id, ...req.body })),
     addPatientVital: jest.fn((req, res) => res.status(201).json({ id: 'vital_1', ...req.body })),
-    // Add other required exports to avoid crashes if routes import them
-    getPatients: jest.fn(),
-    getPatientById: jest.fn(),
-    getPatientByEmail: jest.fn(),
-    getPatientVitals: jest.fn(),
-    createPatient: jest.fn(),
-    deletePatient: jest.fn(),
-    getDocuments: jest.fn(),
-    addDocument: jest.fn()
+    getPatients: jest.fn((req, res) => res.json([])),
+    getPatientById: jest.fn((req, res) => res.json({})),
+    getPatientByEmail: jest.fn((req, res) => res.json({})),
+    getCaregiverPatients: jest.fn((req, res) => res.json([])),
+    getPatientVitals: jest.fn((req, res) => res.json([])),
+    deletePatientVital: jest.fn((req, res) => res.json({ success: true })),
+    createPatient: jest.fn((req, res) => res.status(201).json(req.body)),
+    deletePatient: jest.fn((req, res) => res.json({ success: true })),
+    getDocuments: jest.fn((req, res) => res.json([])),
+    addDocument: jest.fn((req, res) => res.status(201).json(req.body)),
+    addDoctorToPatient: jest.fn((req, res) => res.json({ success: true })),
+    removeDoctorFromPatient: jest.fn((req, res) => res.json({ success: true })),
+    verifyActivationCode: jest.fn((req, res) => res.json({ success: true })),
+    resendActivationCode: jest.fn((req, res) => res.json({ success: true })),
+    activatePatient: jest.fn((req, res) => res.json({ success: true })),
 }));
 
 jest.mock('../controllers/prescriptionController', () => ({

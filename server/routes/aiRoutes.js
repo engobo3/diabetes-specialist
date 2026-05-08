@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const verifyToken = require('../middleware/authMiddleware');
+const { getToolsForRole, executeToolCall } = require('../services/agentTools');
 
 // Auth on all AI routes
 router.use(verifyToken);
@@ -13,7 +14,7 @@ const MODEL_NAME = "gemini-2.0-flash";
 const LANG_NAMES = { fr: 'francais', ln: 'lingala', sw: 'kiswahili', tsh: 'tshiluba', kg: 'kikongo' };
 
 // ─── System Prompt Builder ──────────────────────────────────────────
-function buildSystemPrompt(ctx, langName) {
+function buildSystemPrompt(ctx, langName, role) {
     let patientSection = '';
     if (ctx) {
         const parts = [];
@@ -35,9 +36,28 @@ function buildSystemPrompt(ctx, langName) {
         patientSection = `\n\nPROFIL DU PATIENT:\n${parts.join('\n')}`;
     }
 
-    return `Tu es GlucoBot, un assistant IA specialise en diabetologie pour l'application GlucoSoin, utilisee en RD Congo et en Afrique Centrale.
+    const isDoctor = role === 'doctor' || role === 'admin';
 
-ROLE: Tu accompagnes les patients diabetiques au quotidien avec empathie et expertise.${patientSection}
+    const toolInstructions = isDoctor
+        ? `\n\nOUTILS DISPONIBLES:
+Tu as des outils pour aider le medecin. Utilise-les quand c'est pertinent:
+- generate_patient_summary: pour obtenir un resume patient avant consultation
+- draft_soap_note: pour rediger un brouillon de note SOAP
+- draft_prescription: pour creer une ordonnance
+- find_empty_slots: pour voir tes creneaux libres
+Utilise ces outils de maniere proactive quand le medecin en a besoin.`
+        : `\n\nOUTILS DISPONIBLES:
+Tu as des outils pour aider le patient. Utilise-les quand c'est pertinent:
+- get_available_slots / book_appointment: pour les rendez-vous
+- log_vital: pour enregistrer des mesures de sante
+- get_health_summary: pour un resume de sante complet
+- check_medications / log_medication_taken: pour les medicaments
+- trigger_emergency_alert: SEULEMENT en cas de danger vital (glycemie <54 ou >300, douleur thoracique, etc.)
+Quand le patient veut faire une action, utilise l'outil correspondant au lieu de juste donner des instructions.`;
+
+    return `Tu es GlucoBot, un assistant IA agent specialise en diabetologie pour l'application GlucoSoin, utilisee en RD Congo et en Afrique Centrale.
+
+ROLE: ${isDoctor ? 'Tu assistes le medecin dans la gestion de ses patients.' : 'Tu accompagnes les patients diabetiques au quotidien avec empathie et expertise.'}${patientSection}${toolInstructions}
 
 REGLES:
 - Reponds TOUJOURS en ${langName}.
@@ -45,8 +65,9 @@ REGLES:
 - Sois empathique, encourageant et clair.
 - Utilise les donnees du patient ci-dessus pour personnaliser tes reponses.
 - Si la glycemie est < 54 mg/dL ou > 300 mg/dL, ALERTE le patient et recommande de consulter immediatement.
-- Ne fais JAMAIS de diagnostic ni de prescription. Recommande toujours de consulter un vrai medecin.
-- L'application s'appelle "GlucoSoin".`;
+- ${isDoctor ? 'Tu peux proposer des actions concretes (prescriptions, notes SOAP, etc.).' : 'Ne fais JAMAIS de diagnostic ni de prescription. Recommande toujours de consulter un vrai medecin.'}
+- L'application s'appelle "GlucoSoin".
+- Apres avoir utilise un outil, resume le resultat au patient/medecin de maniere claire et naturelle.`;
 }
 
 // ─── Conversation Context Builder ───────────────────────────────────
@@ -127,30 +148,80 @@ function getFallbackErrorMessage(lang) {
     return (FALLBACK_RESPONSES[lang] || FALLBACK_RESPONSES.fr).error;
 }
 
-// ─── /chat ──────────────────────────────────────────────────────────
+// ─── /chat (AI Agent with Function Calling) ────────────────────────
 router.post('/chat', async (req, res) => {
     const lang = req.body.lang || 'fr';
 
     try {
-        const { message, history, patientContext } = req.body;
+        const { message, history, patientContext, role } = req.body;
 
         if (!message) {
             return res.status(400).json({ error: "Message is required" });
         }
 
+        // Build execution context from the authenticated user
+        const userRole = role || 'patient';
+        const context = {
+            userId: req.user?.uid || '',
+            role: userRole,
+            patientId: req.body.patientId || patientContext?.patientId || '',
+            doctorId: req.body.doctorId || ''
+        };
+
         let text = "";
+        const actions = [];
 
         try {
             const langName = LANG_NAMES[lang] || 'francais';
-            const systemPrompt = buildSystemPrompt(patientContext, langName);
-            const conversationCtx = buildConversationContext(history);
+            const systemPrompt = buildSystemPrompt(patientContext, langName, userRole);
 
-            const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+            // Build Gemini chat history from conversation history
+            const chatHistory = [];
+            if (history && history.length > 0) {
+                for (const msg of history.slice(-10)) {
+                    chatHistory.push({
+                        role: msg.role === 'user' ? 'user' : 'model',
+                        parts: [{ text: msg.text }]
+                    });
+                }
+            }
 
-            const prompt = `${systemPrompt}${conversationCtx}\n\nNouveau message du patient: ${message}`;
+            // Get role-appropriate tools
+            const toolDeclarations = getToolsForRole(userRole);
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
+            const model = genAI.getGenerativeModel({
+                model: MODEL_NAME,
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                tools: [{ functionDeclarations: toolDeclarations }]
+            });
+
+            const chat = model.startChat({ history: chatHistory });
+            let result = await chat.sendMessage(message);
+            let response = result.response;
+
+            // Function calling loop (max 5 iterations)
+            for (let i = 0; i < 5; i++) {
+                const functionCalls = response.functionCalls();
+                if (!functionCalls || functionCalls.length === 0) break;
+
+                const fc = functionCalls[0];
+                console.log(`[GlucoBot Agent] Tool call: ${fc.name}`, JSON.stringify(fc.args));
+
+                const toolResult = await executeToolCall(fc.name, fc.args, context);
+                actions.push({ tool: fc.name, args: fc.args, result: toolResult });
+
+                console.log(`[GlucoBot Agent] Tool result [${fc.name}]:`, toolResult.success ? 'OK' : toolResult.error);
+
+                // Send function response back to Gemini
+                result = await chat.sendMessage([{
+                    functionResponse: {
+                        name: fc.name,
+                        response: toolResult
+                    }
+                }]);
+                response = result.response;
+            }
+
             text = response.text();
 
         } catch (aiError) {
@@ -188,11 +259,11 @@ router.post('/chat', async (req, res) => {
                 : getFallbackResponse('unknown', lang);
         }
 
-        res.json({ reply: text });
+        res.json({ reply: text, actions });
 
     } catch (error) {
         console.error("AI Error:", error);
-        res.json({ reply: getFallbackErrorMessage(lang) });
+        res.json({ reply: getFallbackErrorMessage(lang), actions: [] });
     }
 });
 

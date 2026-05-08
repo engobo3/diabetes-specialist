@@ -13,6 +13,10 @@ const PaymentForm = ({ onSuccess, doctorId, patientId: propPatientId }) => {
     const [currency, setCurrency] = useState('CDF'); // CDF or USD
     const [method, setMethod] = useState('Cash'); // Cash, M-Pesa, Orange Money, Airtel Money, Card
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [cardHolder, setCardHolder] = useState('');
+    const [cardNumber, setCardNumber] = useState('');
+    const [cardExpiry, setCardExpiry] = useState('');
+    const [cardCvv, setCardCvv] = useState('');
     const [loading, setLoading] = useState(false);
     const [loadingStep, setLoadingStep] = useState(''); // 'init', 'ussd_push', 'finalizing'
     const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: '' }
@@ -49,7 +53,7 @@ const PaymentForm = ({ onSuccess, doctorId, patientId: propPatientId }) => {
                 body = { amount: parseFloat(amount), currency, description: 'Consultation médicale', patientId, doctorId };
             } else if (method === 'Card') {
                 endpoint = `${apiUrl}/api/payments/card`;
-                body = { amount: parseFloat(amount), currency, description: 'Consultation médicale', patientId, doctorId, cardNumber: '0000', cardExpiry: '12/30', cardCvv: '000' };
+                body = { amount: parseFloat(amount), currency, description: 'Consultation médicale', patientId, doctorId, cardHolderName: cardHolder, cardNumber, cardExpiry, cardCvv };
             } else {
                 // Mobile money
                 endpoint = `${apiUrl}/api/payments/mobile-money`;
@@ -69,6 +73,7 @@ const PaymentForm = ({ onSuccess, doctorId, patientId: propPatientId }) => {
                 setMessage({ type: 'success', text: 'Paiement confirmé avec succès!' });
                 setAmount('');
                 setPhoneNumber('');
+                setCardHolder(''); setCardNumber(''); setCardExpiry(''); setCardCvv('');
                 if (onSuccess) onSuccess();
             } else {
                 throw new Error('Payment failed');
@@ -165,6 +170,30 @@ const PaymentForm = ({ onSuccess, doctorId, patientId: propPatientId }) => {
                             <p className="text-xs text-gray-500">
                                 Un message de validation sera envoyé sur ce numéro.
                             </p>
+                        </div>
+                    )}
+
+                    {/* Card Input Fields */}
+                    {method === 'Card' && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Titulaire de la carte</label>
+                                <Input required placeholder="Nom sur la carte" value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Numéro de carte</label>
+                                <Input required placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))} maxLength={16} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">Expiration</label>
+                                    <Input required placeholder="MM/AA" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} maxLength={5} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">CVV</label>
+                                    <Input required type="password" placeholder="123" value={cardCvv} onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} maxLength={4} />
+                                </div>
+                            </div>
                         </div>
                     )}
 

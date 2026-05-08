@@ -26,9 +26,19 @@ const inviteCaregiver = async (req, res) => {
       invitedBy
     );
 
-    // TODO: Send email with invitation link
-    // const inviteUrl = `${process.env.CLIENT_URL}/accept-invitation?token=${invitation.inviteToken}`;
-    // await sendInvitationEmail(caregiverEmail, invitation, inviteUrl);
+    // Send invitation email to the caregiver
+    try {
+      const emailService = require('../services/emailNotificationService');
+      const inviteUrl = `${process.env.CLIENT_URL || 'https://diabetes-specialist.web.app'}/accept-invitation?token=${invitation.inviteToken}`;
+      await emailService._sendEmail({
+        to: caregiverEmail,
+        subject: '🤝 Invitation: Accès Aidant sur GlucoSoin',
+        text: `Bonjour,\n\nVous avez été invité(e) comme aidant sur GlucoSoin.\n\nRelation: ${relationship || 'Non spécifiée'}\n\nCliquez sur le lien suivant pour accepter l'invitation:\n${inviteUrl}\n\n--\nGlucoSoin`
+      });
+    } catch (emailErr) {
+      console.warn('Failed to send caregiver invitation email:', emailErr.message);
+      // Non-fatal: invitation still created
+    }
 
     res.status(201).json(invitation);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import RoleSwitcher from '../components/RoleSwitcher';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,7 +23,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    const { container } = render(<RoleSwitcher />);
+    const { container } = render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
     expect(container.firstChild).toBeNull();
   });
 
@@ -33,7 +34,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    const { container } = render(<RoleSwitcher />);
+    const { container } = render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
     expect(container.firstChild).toBeNull();
   });
 
@@ -44,7 +45,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    render(<RoleSwitcher />);
+    render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
 
     expect(screen.getByText('Mon Dossier')).toBeInTheDocument();
     expect(screen.getByText('Patients Gérés')).toBeInTheDocument();
@@ -57,7 +58,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    render(<RoleSwitcher />);
+    render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
 
     const caregiverButton = screen.getByText('Patients Gérés').closest('button');
     expect(caregiverButton.className).toContain('bg-green');
@@ -70,7 +71,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    render(<RoleSwitcher />);
+    render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
 
     const caregiverButton = screen.getByText('Patients Gérés').closest('button');
     fireEvent.click(caregiverButton);
@@ -85,7 +86,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    render(<RoleSwitcher />);
+    render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
 
     expect(screen.getByText('Mon Dossier')).toBeInTheDocument();
     expect(screen.getByText('Patients Gérés')).toBeInTheDocument();
@@ -99,7 +100,7 @@ describe('RoleSwitcher Component', () => {
       switchRole: mockSwitchRole
     });
 
-    const { container } = render(<RoleSwitcher />);
+    const { container } = render(<MemoryRouter><RoleSwitcher /></MemoryRouter>);
 
     // Check that icons are rendered (lucide-react icons render as SVGs)
     const svgs = container.querySelectorAll('svg');

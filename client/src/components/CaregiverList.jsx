@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { Users, Trash2, Shield, Clock } from 'lucide-react';
 
@@ -50,11 +51,11 @@ const CaregiverList = ({ patientId, onUpdate }) => {
         if (onUpdate) onUpdate();
       } else {
         const error = await response.json();
-        alert(error.message || 'Erreur lors de la suppression');
+        toast.error(error.message || 'Erreur lors de la suppression');
       }
     } catch (error) {
       console.error('Error removing caregiver:', error);
-      alert('Erreur réseau');
+      toast.error('Erreur réseau');
     }
   };
 

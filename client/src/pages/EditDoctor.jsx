@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -137,7 +138,7 @@ const EditDoctor = () => {
             setFormData(prev => ({ ...prev, image: downloadURL }));
         } catch (error) {
             console.error("Error uploading image:", error);
-            alert("Erreur lors du téléchargement de l'image");
+            toast.error("Erreur lors du téléchargement de l'image");
         } finally {
             setUploading(false);
         }

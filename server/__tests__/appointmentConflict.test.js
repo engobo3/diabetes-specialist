@@ -31,8 +31,11 @@ jest.mock('../services/notificationService', () => ({
     createNotification: mockCreateNotification
 }));
 
-// --- Mock firebaseConfig (used by appointmentController for _notifyDoctor/_notifyPatient) ---
+// --- Mock firebaseConfig (used by appointmentController for transactions and _notifyDoctor/_notifyPatient) ---
 const mockFirestoreDocGet = jest.fn();
+const mockTransactionGet = jest.fn();
+const mockTransactionSet = jest.fn();
+
 jest.mock('../config/firebaseConfig', () => ({
     db: {
         collection: jest.fn(() => ({
@@ -46,7 +49,14 @@ jest.mock('../config/firebaseConfig', () => ({
                 })),
                 get: jest.fn().mockResolvedValue({ empty: true, docs: [], data: () => ({ count: 0 }) })
             }))
-        }))
+        })),
+        runTransaction: jest.fn(async (callback) => {
+            const transaction = {
+                get: mockTransactionGet,
+                set: mockTransactionSet
+            };
+            return callback(transaction);
+        })
     }
 }));
 
@@ -85,6 +95,9 @@ describe('Appointment Conflict Detection', () => {
         jest.clearAllMocks();
         mockGetAppointments.mockResolvedValue([]);
         mockFirestoreDocGet.mockResolvedValue({ exists: false });
+        // Default: slot is free (no existing reservation)
+        mockTransactionGet.mockResolvedValue({ exists: false });
+        mockTransactionSet.mockImplementation(() => { });
     });
 
     describe('POST /api/appointments — createNewAppointment', () => {
@@ -111,9 +124,8 @@ describe('Appointment Conflict Detection', () => {
         });
 
         it('returns 409 when same doctor+date+time is already booked', async () => {
-            mockGetAppointments.mockResolvedValue([
-                { date: '2026-03-15', time: '09:00', status: 'confirmed' }
-            ]);
+            // Slot already reserved in transaction
+            mockTransactionGet.mockResolvedValue({ exists: true });
 
             const res = await request(app)
                 .post('/api/appointments')
@@ -125,10 +137,8 @@ describe('Appointment Conflict Detection', () => {
             expect(mockCreateAppointment).not.toHaveBeenCalled();
         });
 
-        it('detects conflict for pending status', async () => {
-            mockGetAppointments.mockResolvedValue([
-                { date: '2026-03-15', time: '09:00', status: 'pending' }
-            ]);
+        it('detects conflict for pending status (slot exists)', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true });
 
             const res = await request(app)
                 .post('/api/appointments')
@@ -138,10 +148,8 @@ describe('Appointment Conflict Detection', () => {
             expect(res.statusCode).toBe(409);
         });
 
-        it('detects conflict for Scheduled status (capital S)', async () => {
-            mockGetAppointments.mockResolvedValue([
-                { date: '2026-03-15', time: '09:00', status: 'Scheduled' }
-            ]);
+        it('detects conflict for Scheduled status (slot exists)', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true });
 
             const res = await request(app)
                 .post('/api/appointments')
@@ -151,10 +159,8 @@ describe('Appointment Conflict Detection', () => {
             expect(res.statusCode).toBe(409);
         });
 
-        it('does not conflict with completed appointments', async () => {
-            mockGetAppointments.mockResolvedValue([
-                { date: '2026-03-15', time: '09:00', status: 'completed' }
-            ]);
+        it('creates appointment when no slot exists (no conflict)', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: false });
             mockCreateAppointment.mockResolvedValue({ id: 'apt_2', ...validBody, status: 'pending' });
 
             const res = await request(app)
@@ -165,16 +171,14 @@ describe('Appointment Conflict Detection', () => {
             expect(res.statusCode).toBe(201);
         });
 
-        it('does not conflict with rejected appointments', async () => {
-            mockGetAppointments.mockResolvedValue([
-                { date: '2026-03-15', time: '09:00', status: 'rejected' }
-            ]);
-            mockCreateAppointment.mockResolvedValue({ id: 'apt_3', ...validBody, status: 'pending' });
+        it('creates appointment for different slot', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: false });
+            mockCreateAppointment.mockResolvedValue({ id: 'apt_3', ...validBody, time: '10:00', status: 'pending' });
 
             const res = await request(app)
                 .post('/api/appointments')
                 .set('Authorization', 'Bearer token')
-                .send(validBody);
+                .send({ ...validBody, time: '10:00' });
 
             expect(res.statusCode).toBe(201);
         });
@@ -221,6 +225,7 @@ describe('Appointment Conflict Detection', () => {
         });
 
         it('does not crash when notification fails', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: false });
             mockCreateAppointment.mockResolvedValue({ id: 'apt_5', ...validBody, status: 'pending' });
             mockFirestoreDocGet.mockRejectedValue(new Error('Firestore down'));
 

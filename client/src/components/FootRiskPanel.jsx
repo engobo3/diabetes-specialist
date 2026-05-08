@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertTriangle, Shield, CheckCircle, Loader2, History, ClipboardList, Info, Camera, X, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
@@ -457,13 +458,13 @@ const FootRiskPanel = ({ patientId, patient }) => {
     const handleImageSelect = (e) => {
         const files = Array.from(e.target.files);
         if (woundImages.length + files.length > 3) {
-            alert(t.maxImages);
+            toast.error(t.maxImages);
             return;
         }
 
         const valid = files.filter(f => {
-            if (!f.type.startsWith('image/')) { alert(`${f.name} ${t.notAnImage}`); return false; }
-            if (f.size > 5 * 1024 * 1024) { alert(`${f.name} ${t.exceeds5MB}`); return false; }
+            if (!f.type.startsWith('image/')) { toast.error(`${f.name} ${t.notAnImage}`); return false; }
+            if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} ${t.exceeds5MB}`); return false; }
             return true;
         });
 
@@ -587,7 +588,7 @@ const FootRiskPanel = ({ patientId, patient }) => {
             fetchHistory();
         } catch (err) {
             console.error('Prediction error:', err);
-            alert(`${t.error}: ${err.message}`);
+            toast.error(`${t.error}: ${err.message}`);
         } finally {
             setLoading(false);
         }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { Printer, ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { buildUnitMap, DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
@@ -60,7 +61,7 @@ const MedicalDossier = ({
             window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('PDF download error:', err);
-            alert('Erreur lors du téléchargement du PDF.');
+            toast.error('Erreur lors du téléchargement du PDF.');
         } finally {
             setDownloading(false);
         }

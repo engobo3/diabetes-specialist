@@ -14,6 +14,15 @@ vi.mock('../../firebase', () => ({
     auth: {},
 }));
 
+// Mock react-hot-toast
+vi.mock('react-hot-toast', () => ({
+    default: {
+        success: vi.fn(),
+        error: vi.fn(),
+        loading: vi.fn(),
+    },
+}));
+
 // Mock react-router-dom's useNavigate
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -43,7 +52,8 @@ describe('Login Page', () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByPlaceholderText('Email ou Téléphone')).toBeInTheDocument();
+        // Translations are accent-free: "Email ou Telephone", "Mot de passe", "Se connecter"
+        expect(screen.getByPlaceholderText('Email ou Telephone')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Mot de passe')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
     });
@@ -55,7 +65,7 @@ describe('Login Page', () => {
             </MemoryRouter>
         );
 
-        const emailInput = screen.getByPlaceholderText('Email ou Téléphone');
+        const emailInput = screen.getByPlaceholderText('Email ou Telephone');
         const passwordInput = screen.getByPlaceholderText('Mot de passe');
 
         fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
@@ -74,7 +84,7 @@ describe('Login Page', () => {
             </MemoryRouter>
         );
 
-        fireEvent.change(screen.getByPlaceholderText('Email ou Téléphone'), { target: { value: 'test@example.com' } });
+        fireEvent.change(screen.getByPlaceholderText('Email ou Telephone'), { target: { value: 'test@example.com' } });
         fireEvent.change(screen.getByPlaceholderText('Mot de passe'), { target: { value: 'password123' } });
 
         fireEvent.click(screen.getByRole('button', { name: 'Se connecter' }));
@@ -84,7 +94,8 @@ describe('Login Page', () => {
         });
     });
 
-    it('displays error on login failure', async () => {
+    it('shows error toast on login failure', async () => {
+        const toast = (await import('react-hot-toast')).default;
         mockLogin.mockRejectedValue(new Error('Auth failed'));
 
         render(
@@ -93,13 +104,14 @@ describe('Login Page', () => {
             </MemoryRouter>
         );
 
-        fireEvent.change(screen.getByPlaceholderText('Email ou Téléphone'), { target: { value: 'wrong@example.com' } });
+        fireEvent.change(screen.getByPlaceholderText('Email ou Telephone'), { target: { value: 'wrong@example.com' } });
         fireEvent.change(screen.getByPlaceholderText('Mot de passe'), { target: { value: 'wrongpass' } });
 
         fireEvent.click(screen.getByRole('button', { name: 'Se connecter' }));
 
         await waitFor(() => {
-            expect(screen.getByText('Échec de la connexion. Vérifiez vos identifiants.')).toBeInTheDocument();
+            // The login page uses toast.error(t.loginFailed) on failure
+            expect(toast.error).toHaveBeenCalledWith('Echec de la connexion. Verifiez vos identifiants.');
         });
     });
 });

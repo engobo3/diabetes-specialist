@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, LabelList } from 'recharts';
-import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles, Edit2, Save, Calendar, Phone, FileText, Upload, Trash2, ClipboardList, UserPlus, X, Stethoscope } from 'lucide-react';
+import { Activity, Heart, Scale, Droplets, ArrowLeft, Sparkles, Edit2, Save, Calendar, Phone, FileText, Upload, Trash2, ClipboardList, UserPlus, X, Stethoscope, Pill } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MedicalDossier from '../components/MedicalDossier';
 import FootRiskPanel from '../components/FootRiskPanel';
+import MedicationScheduleManager from '../components/MedicationScheduleManager';
 import { resolveIcon, findVitalType, getDefaultVitalType, buildPayload, getVitalLabelFr, getFieldLabelFr, DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
 
 const PatientDetails = () => {
@@ -132,11 +134,11 @@ const PatientDetails = () => {
                 fetchData();
                 e.target.reset();
             } else {
-                alert('Erreur lors de l\'ajout de la lecture');
+                toast.error('Erreur lors de l\'ajout de la lecture');
             }
         } catch (error) {
             console.error('Error adding vital:', error);
-            alert('Erreur lors de l\'ajout de la lecture');
+            toast.error('Erreur lors de l\'ajout de la lecture');
         }
     };
 
@@ -155,7 +157,7 @@ const PatientDetails = () => {
             }));
         } catch (error) {
             console.error('Error deleting vital:', error);
-            alert('Erreur lors de la suppression.');
+            toast.error('Erreur lors de la suppression.');
         }
     };
 
@@ -183,11 +185,11 @@ const PatientDetails = () => {
                 fetchData();
                 e.target.reset();
             } else {
-                alert('Erreur lors de l\'ajout de l\'ordonnance');
+                toast.error('Erreur lors de l\'ajout de l\'ordonnance');
             }
         } catch (error) {
             console.error('Error adding prescription:', error);
-            alert('Erreur lors de l\'ajout de l\'ordonnance');
+            toast.error('Erreur lors de l\'ajout de l\'ordonnance');
         }
     };
 
@@ -200,7 +202,7 @@ const PatientDetails = () => {
             title: formData.get('title'),
             content: formData.get('content'),
             date: formData.get('date') || new Date().toISOString().split('T')[0],
-            doctorName: 'Dr. Specialist'
+            doctorName: currentUser?.displayName || 'Médecin traitant'
         };
         try {
             const token = await currentUser.getIdToken();
@@ -213,11 +215,11 @@ const PatientDetails = () => {
                 fetchData();
                 e.target.reset();
             } else {
-                alert('Erreur lors de l\'ajout du dossier medical');
+                toast.error('Erreur lors de l\'ajout du dossier medical');
             }
         } catch (error) {
             console.error('Error adding medical record:', error);
-            alert('Erreur lors de l\'ajout du dossier medical');
+            toast.error('Erreur lors de l\'ajout du dossier medical');
         }
     };
 
@@ -229,7 +231,7 @@ const PatientDetails = () => {
         const type = formData.get('type');
 
         if (!file) {
-            alert("Veuillez sélectionner un fichier.");
+            toast.error("Veuillez sélectionner un fichier.");
             setUploading(false);
             return;
         }
@@ -259,13 +261,13 @@ const PatientDetails = () => {
             if (response.ok) {
                 fetchData();
                 e.target.reset();
-                alert("Document ajouté avec succès !");
+                toast.success("Document ajouté avec succès !");
             } else {
-                alert("Erreur lors de l'enregistrement du document.");
+                toast.error("Erreur lors de l'enregistrement du document.");
             }
         } catch (error) {
             console.error("Upload error:", error);
-            alert("Erreur lors de l'upload.");
+            toast.error("Erreur lors de l'upload.");
         } finally {
             setUploading(false);
         }
@@ -286,7 +288,7 @@ const PatientDetails = () => {
                 setSelectedDoctorId('');
                 setShowAddDoctor(false);
             } else {
-                alert('Erreur lors de l\'ajout du médecin');
+                toast.error('Erreur lors de l\'ajout du médecin');
             }
         } catch (error) {
             console.error('Error adding doctor:', error);
@@ -306,7 +308,7 @@ const PatientDetails = () => {
                 setPatient(updated);
             } else {
                 const err = await response.json();
-                alert(err.message || 'Erreur');
+                toast.error(err.message || 'Erreur');
             }
         } catch (error) {
             console.error('Error removing doctor:', error);
@@ -338,11 +340,11 @@ const PatientDetails = () => {
                 setPatient(prev => ({ ...prev, phone }));
                 setIsEditingPhone(false);
             } else {
-                alert('Erreur lors de la mise à jour du téléphone');
+                toast.error('Erreur lors de la mise à jour du téléphone');
             }
         } catch (error) {
             console.error('Error updating phone:', error);
-            alert('Erreur lors de la mise à jour');
+            toast.error('Erreur lors de la mise à jour');
         }
     };
 
@@ -361,11 +363,11 @@ const PatientDetails = () => {
                 ));
                 setEditingNoteId(null);
             } else {
-                alert('Erreur lors de l\'enregistrement de la note');
+                toast.error('Erreur lors de l\'enregistrement de la note');
             }
         } catch (error) {
             console.error('Error saving note:', error);
-            alert('Erreur lors de l\'enregistrement');
+            toast.error('Erreur lors de l\'enregistrement');
         }
     };
 
@@ -395,7 +397,7 @@ const PatientDetails = () => {
 
     const handleForecast = async () => {
         if (filteredVitals.length < 3) {
-            alert("Pas assez de données pour l'analyse (minimum 3).");
+            toast.error("Pas assez de données pour l'analyse (minimum 3).");
             return;
         }
 
@@ -419,7 +421,7 @@ const PatientDetails = () => {
 
         } catch (error) {
             console.error(error);
-            alert("Erreur lors de l'analyse IA.");
+            toast.error("Erreur lors de l'analyse IA.");
         } finally {
             setAnalyzing(false);
         }
@@ -617,6 +619,15 @@ const PatientDetails = () => {
                     >
                         Risque Podologique
                     </button>
+                    <button
+                        onClick={() => setSelectedVitalType('Medications')}
+                        className={`px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] ${selectedVitalType === 'Medications'
+                            ? 'bg-blue-50 text-blue-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        Medicaments
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-1">
@@ -765,6 +776,12 @@ const PatientDetails = () => {
                             />
                         ) : selectedVitalType === 'FootRisk' ? (
                             <FootRiskPanel patientId={id} patient={patient} />
+                        ) : selectedVitalType === 'Medications' ? (
+                            <MedicationScheduleManager
+                                patientId={id}
+                                currentUser={currentUser}
+                                isDoctor={true}
+                            />
                         ) : (
                             <>
                                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

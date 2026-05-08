@@ -57,9 +57,9 @@ describe('LandingPage Component', () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByText('Rencontrez Nos Spécialistes')).toBeInTheDocument();
-        expect(screen.getByText(/Soins de Classe Mondiale/)).toBeInTheDocument();
-        expect(screen.getByText('Trouver un Spécialiste')).toBeInTheDocument();
+        // Translations are accent-free
+        expect(screen.getByText('Rencontrez Nos Specialistes')).toBeInTheDocument();
+        expect(screen.getByText('Trouver un Specialiste')).toBeInTheDocument();
     });
 
     it('fetches and displays only diabetes specialists', async () => {

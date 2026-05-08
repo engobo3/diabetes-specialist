@@ -285,8 +285,35 @@ exports.disable2FA = async (req, res) => {
             });
         }
 
-        // TODO: Verify password (requires password verification implementation)
-        // For now, we trust that the 2FA token is sufficient
+        // Verify password using Firebase Auth REST API
+        const fetch = require('node-fetch');
+        const apiKey = process.env.FIREBASE_WEB_API_KEY;
+        if (!apiKey) {
+            console.warn('FIREBASE_WEB_API_KEY not set — password verification skipped');
+        } else {
+            try {
+                const authResponse = await fetch(
+                    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, returnSecureToken: false })
+                    }
+                );
+                if (!authResponse.ok) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Invalid password. Cannot disable 2FA.'
+                    });
+                }
+            } catch (authErr) {
+                console.error('Password verification error:', authErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Password verification failed'
+                });
+            }
+        }
 
         // Disable 2FA
         await userRef.update({

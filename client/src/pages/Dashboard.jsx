@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { userRole, userRoles, activeRole, doctorProfile, currentUser, logout } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
@@ -194,6 +195,16 @@ const Dashboard = () => {
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
+                        {!isAdmin && (
+                            <button
+                                onClick={() => navigate('/doctor-calendar')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+                                title="Calendrier"
+                            >
+                                <Calendar size={16} />
+                                <span className="hidden sm:inline font-medium">Calendrier</span>
+                            </button>
+                        )}
                         {userRoles && userRoles.length > 1 && <RoleSwitcher />}
                         <span className="text-sm font-medium text-gray-700 hidden sm:block">
                             {doctorProfile ? doctorProfile.name : "Dr. Spécialiste"}
@@ -481,6 +492,14 @@ const Dashboard = () => {
                                         </CardContent>
                                     </Card>
                                 </Link>
+                                <Link to="/doctor-calendar">
+                                    <Card className="hover:shadow-md transition-shadow cursor-pointer group">
+                                        <CardContent className="p-5 text-center">
+                                            <Calendar size={24} className="mx-auto text-orange-600 mb-2 group-hover:scale-110 transition-transform" />
+                                            <p className="text-sm font-medium text-gray-700">Calendrier</p>
+                                        </CardContent>
+                                    </Card>
+                                </Link>
                             </div>
                         </div>
                     </>
@@ -505,11 +524,16 @@ const Dashboard = () => {
 
                         {/* Appointment Requests Section */}
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <Calendar size={20} className="text-gray-500" />
-                                Demandes de Rendez-vous
-                                {pendingAppointments.length > 0 && <Badge variant="warning" className="ml-2">{pendingAppointments.length}</Badge>}
-                            </h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                    <Calendar size={20} className="text-gray-500" />
+                                    Demandes de Rendez-vous
+                                    {pendingAppointments.length > 0 && <Badge variant="warning" className="ml-2">{pendingAppointments.length}</Badge>}
+                                </h2>
+                                <Link to="/doctor-calendar" className="text-sm text-primary hover:underline flex items-center gap-1">
+                                    Voir calendrier <ChevronRight size={14} />
+                                </Link>
+                            </div>
                             {loading ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full" />)}
@@ -607,6 +631,11 @@ const Dashboard = () => {
                                     <User size={28} className="text-gray-700" /> Aperçu des Patients
                                 </h1>
                                 <div className="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
+                                    <Link to="/doctor-calendar" className="w-full sm:w-auto">
+                                        <Button variant="secondary" className="w-full gap-2 bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200">
+                                            <Calendar size={18} /> Calendrier
+                                        </Button>
+                                    </Link>
                                     <Link to="/terminal" className="w-full sm:w-auto">
                                         <Button variant="secondary" className="w-full gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200">
                                             <CreditCard size={18} /> <span className="hidden sm:inline">Terminal</span> Paiement

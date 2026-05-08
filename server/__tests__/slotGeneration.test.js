@@ -1,20 +1,26 @@
 const request = require('supertest');
 
-// --- Mock firebase (db) for doctorController ---
+// --- Mock firebaseConfig (db) for doctorController & appointmentController ---
 const mockDocGet = jest.fn();
 const mockWhereGet = jest.fn();
 
-jest.mock('../config/firebase', () => ({
+jest.mock('../config/firebaseConfig', () => ({
     db: {
-        collection: jest.fn(() => ({
+        collection: jest.fn((collectionName) => ({
             doc: jest.fn(() => ({
-                get: mockDocGet
+                get: mockDocGet,
+                set: jest.fn().mockResolvedValue(undefined)
             })),
             where: jest.fn(() => ({
                 limit: jest.fn(() => ({
                     get: mockWhereGet
-                }))
+                })),
+                get: jest.fn().mockResolvedValue({ empty: true, docs: [], data: () => ({ count: 0 }) })
             }))
+        })),
+        runTransaction: jest.fn(async (cb) => cb({
+            get: jest.fn().mockResolvedValue({ exists: false }),
+            set: jest.fn()
         }))
     }
 }));
@@ -46,23 +52,6 @@ jest.mock('../services/notificationService', () => ({
     createNotification: jest.fn().mockResolvedValue(null)
 }));
 
-// --- Mock firebaseConfig (used by appointmentController, notificationController) ---
-jest.mock('../config/firebaseConfig', () => ({
-    db: {
-        collection: jest.fn(() => ({
-            doc: jest.fn(() => ({
-                get: jest.fn().mockResolvedValue({ exists: false }),
-                set: jest.fn().mockResolvedValue(undefined)
-            })),
-            where: jest.fn(() => ({
-                limit: jest.fn(() => ({
-                    get: jest.fn().mockResolvedValue({ empty: true, docs: [] })
-                })),
-                get: jest.fn().mockResolvedValue({ empty: true, docs: [], data: () => ({ count: 0 }) })
-            }))
-        }))
-    }
-}));
 
 const { app } = require('../server');
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -52,7 +53,7 @@ const AddDoctor = () => {
         },
         onError: (error) => {
             console.error('Error adding doctor:', error);
-            alert(`Erreur: ${error.message}`);
+            toast.error(`Erreur: ${error.message}`);
         }
     });
 
@@ -72,7 +73,7 @@ const AddDoctor = () => {
             setFormData(prev => ({ ...prev, image: downloadURL }));
         } catch (error) {
             console.error("Error uploading image:", error);
-            alert("Erreur lors du téléchargement de l'image");
+            toast.error("Erreur lors du téléchargement de l'image");
         } finally {
             setUploading(false);
         }

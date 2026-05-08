@@ -8,7 +8,10 @@ const NotificationSchema = z.object({
         'appointment_new',
         'appointment_reminder',
         'vital_reminder',
+        'vital_escalation',
+        'medication_reminder',
         'new_patient_data',
+        'emergency_alert',
         'system'
     ]),
     title: z.string().min(1),

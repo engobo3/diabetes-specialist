@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle, Copy, Check, Send } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -55,7 +56,7 @@ const AddPatient = () => {
                 }
             } else {
                 const errData = await response.json();
-                alert(`Erreur: ${errData.message || 'Impossible de créer le patient'}`);
+                toast.error(`Erreur: ${errData.message || 'Impossible de créer le patient'}`);
             }
         } catch (error) {
             console.error("Error creating patient", error);

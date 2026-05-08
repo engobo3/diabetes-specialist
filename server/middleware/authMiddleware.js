@@ -18,9 +18,27 @@ const verifyToken = async (req, res, next) => {
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
         req.user = decodedToken;
+
+        // Enrich req.user with role, patientId, doctorId from Firestore
+        try {
+            const { db } = require('../config/firebaseConfig');
+            if (db) {
+                const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    req.user.role = userData.role || null;
+                    req.user.patientId = userData.patientId || null;
+                    req.user.doctorId = userData.doctorId || null;
+                }
+            }
+        } catch (enrichError) {
+            // Non-fatal: proceed with base token data if Firestore lookup fails
+            console.warn('Could not enrich user token with role data:', enrichError.message);
+        }
+
         next();
     } catch (error) {
-        console.error('Token verification failed');
+        console.error('Token verification failed:', error.message);
         res.status(403).json({ message: 'Forbidden: Invalid Token' });
     }
 };

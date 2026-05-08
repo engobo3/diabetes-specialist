@@ -18,7 +18,11 @@ const { rateLimit } = require('../middleware/securityMiddleware');
 router.post('/webhook', (req, res, next) => {
     const secret = process.env.FLEXPAY_WEBHOOK_SECRET;
     if (!secret) {
-        console.warn('FLEXPAY_WEBHOOK_SECRET not set — webhook accepted without verification');
+        if (process.env.NODE_ENV === 'production') {
+            console.error('FLEXPAY_WEBHOOK_SECRET not set in production — rejecting webhook');
+            return res.status(500).json({ error: 'Webhook not configured' });
+        }
+        console.warn('FLEXPAY_WEBHOOK_SECRET not set — webhook accepted without verification (dev only)');
         return next();
     }
     const provided = req.headers['x-webhook-secret'] || req.query.secret;

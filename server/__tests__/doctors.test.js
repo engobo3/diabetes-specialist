@@ -20,6 +20,7 @@ jest.mock('../controllers/doctorController', () => ({
     addDoctor: jest.fn((req, res) => res.status(201).json({ id: 2, ...req.body })),
     updateDoctor: jest.fn((req, res) => res.json({ id: req.params.id, ...req.body })),
     deleteDoctor: jest.fn((req, res) => res.json({ message: 'Deleted' })),
+    getAvailableSlots: jest.fn((req, res) => res.json({ slots: [], message: 'No slots available' })),
 }));
 
 describe('Doctor Routes', () => {

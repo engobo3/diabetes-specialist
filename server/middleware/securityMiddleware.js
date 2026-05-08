@@ -13,15 +13,15 @@ const auditLogger = require('../services/auditLogger');
  * Redirects HTTP requests to HTTPS
  */
 const enforceHTTPS = (req, res, next) => {
-    // Skip in development/test environments
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    // Only enforce HTTPS in production
+    if (process.env.NODE_ENV !== 'production') {
         return next();
     }
 
     // Check if request is secure
-    const isSecure = req.secure || 
-                     req.headers['x-forwarded-proto'] === 'https' ||
-                     req.connection.encrypted;
+    const isSecure = req.secure ||
+        req.headers['x-forwarded-proto'] === 'https' ||
+        req.connection.encrypted;
 
     if (!isSecure) {
         return res.status(403).json({
@@ -40,24 +40,24 @@ const enforceHTTPS = (req, res, next) => {
 const securityHeaders = (req, res, next) => {
     // Prevent clickjacking
     res.setHeader('X-Frame-Options', 'DENY');
-    
+
     // Prevent MIME type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    
+
     // Enable XSS protection
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    
+
     // Strict Transport Security (HSTS) - enforce HTTPS for 1 year
     if (process.env.NODE_ENV === 'production') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
-    
+
     // CSP for API responses (JSON, not HTML). The SPA gets its CSP from Firebase Hosting headers.
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
-    
+
     // Referrer Policy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
+
     // Permissions Policy (formerly Feature Policy)
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
@@ -70,6 +70,18 @@ const securityHeaders = (req, res, next) => {
  */
 const requestCounts = new Map();
 
+// Periodic cleanup to prevent memory leak from unbounded Map growth
+// .unref() allows the process (and Jest) to exit without waiting for the timer
+const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, info] of requestCounts) {
+        if (now > info.resetTime) {
+            requestCounts.delete(ip);
+        }
+    }
+}, 5 * 60 * 1000);
+cleanupTimer.unref();
+
 const rateLimit = (options = {}) => {
     const {
         windowMs = 15 * 60 * 1000, // 15 minutes
@@ -80,18 +92,18 @@ const rateLimit = (options = {}) => {
     return (req, res, next) => {
         const ip = req.ip || req.connection.remoteAddress;
         const now = Date.now();
-        
+
         // Get or initialize counter for this IP
         let requestInfo = requestCounts.get(ip) || { count: 0, resetTime: now + windowMs };
-        
+
         // Reset if window has expired
         if (now > requestInfo.resetTime) {
             requestInfo = { count: 0, resetTime: now + windowMs };
         }
-        
+
         requestInfo.count++;
         requestCounts.set(ip, requestInfo);
-        
+
         // Check if limit exceeded
         if (requestInfo.count > maxRequests) {
             // Log security event
@@ -125,12 +137,12 @@ const rateLimit = (options = {}) => {
                 retryAfter: Math.ceil((requestInfo.resetTime - now) / 1000)
             });
         }
-        
+
         // Add rate limit headers
         res.setHeader('X-RateLimit-Limit', maxRequests);
         res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - requestInfo.count));
         res.setHeader('X-RateLimit-Reset', new Date(requestInfo.resetTime).toISOString());
-        
+
         next();
     };
 };

@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const { db } = require('../config/firebaseConfig');
 const { validateDoctor } = require('../utils/validation');
 const { getAppointments } = require('../services/database');
 const fs = require('fs');
@@ -267,8 +267,25 @@ const getAvailableSlots = async (req, res) => {
             .filter(a => a.date === date && activeStatuses.includes(a.status))
             .map(a => a.time);
 
-        // Filter out booked slots
-        const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+        // Fetch doctor personal events (blocks) for this date
+        const DoctorEventRepository = require('../repositories/DoctorEventRepository');
+        const eventRepo = new DoctorEventRepository();
+        const doctorEvents = await eventRepo.findByDoctorAndDate(doctorId, date);
+
+        const blockedSlots = new Set();
+        for (const evt of doctorEvents) {
+            const evtStartMin = parseInt(evt.startTime.split(':')[0]) * 60 + parseInt(evt.startTime.split(':')[1]);
+            const evtEndMin = parseInt(evt.endTime.split(':')[0]) * 60 + parseInt(evt.endTime.split(':')[1]);
+            for (const slot of allSlots) {
+                const slotMin = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
+                if (slotMin >= evtStartMin && slotMin < evtEndMin) {
+                    blockedSlots.add(slot);
+                }
+            }
+        }
+
+        // Filter out booked slots and doctor-blocked slots
+        const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot) && !blockedSlots.has(slot));
 
         res.json({ slots: availableSlots, slotDuration, date });
     } catch (error) {

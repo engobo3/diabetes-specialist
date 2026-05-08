@@ -5,7 +5,7 @@ import HealthInsightsPanel from '../components/HealthInsightsPanel';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
-import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus, Users, Brain, ClipboardList, Footprints, Trash2 } from 'lucide-react';
+import { Droplets, Activity, Scale, Heart, Calendar, FileText, MessageSquare, LogOut, Clock, CheckCircle, XCircle, Sparkles, Banknote, Plus, Users, Brain, ClipboardList, Footprints, Trash2, Settings, Pill, Menu, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { resolveIcon, findVitalType, getDefaultVitalType, buildPayload, getVitalLabelFr, getFieldLabelFr, DEFAULT_VITAL_TYPES } from '../utils/vitalHelpers';
 import Button from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -19,6 +19,11 @@ import CaregiverList from '../components/CaregiverList';
 import RoleSwitcher from '../components/RoleSwitcher';
 import MedicalDossier from '../components/MedicalDossier';
 import FootRiskSummaryCard from '../components/FootRiskSummaryCard';
+import NotificationPreferences from '../components/NotificationPreferences';
+import MedicationScheduleManager from '../components/MedicationScheduleManager';
+import Sidebar from '../components/Sidebar';
+import PatientProfile from '../components/PatientProfile';
+import toast from 'react-hot-toast';
 
 const PatientPortal = () => {
     const { patientId, logout, currentUser, userRole, managedPatients } = useAuth();
@@ -32,9 +37,36 @@ const PatientPortal = () => {
     const [forecast, setForecast] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [isAddVitalOpen, setIsAddVitalOpen] = useState(false);
+    const [addVitalDate, setAddVitalDate] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [medicalRecords, setMedicalRecords] = useState([]);
     const [documents, setDocuments] = useState([]);
     const [dossierAppointments, setDossierAppointments] = useState([]);
+
+    const refreshData = async () => {
+        if (!currentUser || !patientId) return;
+        try {
+            const token = await currentUser.getIdToken();
+            const headers = { 'Authorization': `Bearer ${token}` };
+            const [patientRes, vitalsRes, prescriptionsRes, medicalRecordsRes, documentsRes, appointmentsRes] = await Promise.all([
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/vitals`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${patientId}`, { headers }).then(res => res.json()),
+                fetch(`${import.meta.env.VITE_API_URL}/api/medical-records/patient/${patientId}`, { headers }).then(res => res.ok ? res.json() : []),
+                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${patientId}/documents`, { headers }).then(res => res.ok ? res.json() : []),
+                fetch(`${import.meta.env.VITE_API_URL}/api/appointments`, { headers }).then(res => res.ok ? res.json() : [])
+            ]);
+            setPatient(patientRes);
+            setVitals(vitalsRes);
+            setPrescriptions(prescriptionsRes);
+            setMedicalRecords(Array.isArray(medicalRecordsRes) ? medicalRecordsRes : []);
+            setDocuments(Array.isArray(documentsRes) ? documentsRes : []);
+            const patientApps = (Array.isArray(appointmentsRes) ? appointmentsRes : []).filter(a => String(a.patientId) === String(patientId));
+            setDossierAppointments(patientApps);
+        } catch (err) {
+            console.error('Error refreshing data', err);
+        }
+    };
 
     useEffect(() => {
         if (!currentUser) return;
@@ -144,7 +176,7 @@ const PatientPortal = () => {
 
     const handleForecast = async () => {
         if (filteredVitals.length < 3) {
-            alert("Pas assez de données pour l'analyse (minimum 3).");
+            toast.error("Pas assez de données pour l'analyse (minimum 3).");
             return;
         }
 
@@ -172,7 +204,7 @@ const PatientPortal = () => {
 
         } catch (error) {
             console.error(error);
-            alert("Erreur lors de l'analyse IA.");
+            toast.error("Erreur lors de l'analyse IA.");
         } finally {
             setAnalyzing(false);
         }
@@ -193,7 +225,7 @@ const PatientPortal = () => {
             }));
         } catch (error) {
             console.error('Error deleting vital:', error);
-            alert('Erreur lors de la suppression.');
+            toast.error('Erreur lors de la suppression.');
         }
     };
 
@@ -214,40 +246,77 @@ const PatientPortal = () => {
         referral: 'Orientation'
     };
 
-    const navItems = [
-        { id: 'overview', label: "Vue d'ensemble", icon: Activity },
-        { id: 'ai-insights', label: "Analyse IA", icon: Brain },
-        { id: 'appointments', label: "Rendez-vous", icon: Calendar },
-        { id: 'prescriptions', label: "Ordonnances", icon: FileText },
-        { id: 'medical-records', label: "Dossier Medical", icon: ClipboardList },
-        { id: 'payments', label: "Paiements", icon: Banknote },
-        { id: 'messages', label: "Messagerie", icon: MessageSquare },
-        { id: 'foot-risk', label: "Risque Podologique", icon: Footprints },
-        { id: 'caregivers', label: "Aidants", icon: Users },
+    const navGroups = [
+        {
+            label: 'Sante',
+            items: [
+                { id: 'overview', label: "Vue d'ensemble", icon: Activity },
+                { id: 'ai-insights', label: "Analyse IA", icon: Brain },
+                { id: 'medical-records', label: "Dossier Medical", icon: ClipboardList },
+                { id: 'medications', label: "Medicaments", icon: Pill },
+                { id: 'foot-risk', label: "Risque Podologique", icon: Footprints },
+            ],
+        },
+        {
+            label: 'Services',
+            items: [
+                { id: 'appointments', label: "Rendez-vous", icon: Calendar },
+                { id: 'prescriptions', label: "Ordonnances", icon: FileText },
+                { id: 'payments', label: "Paiements", icon: Banknote },
+                { id: 'messages', label: "Messagerie", icon: MessageSquare },
+                { id: 'caregivers', label: "Aidants", icon: Users },
+            ],
+        },
+        {
+            label: 'Compte',
+            items: [
+                { id: 'profile', label: "Mon Profil", icon: User },
+                { id: 'settings', label: "Parametres", icon: Settings },
+            ],
+        },
     ];
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-gray-900">
-            <nav className="bg-white border-b border-gray-200 sticky top-0 z-10 print:hidden">
+            <nav className="bg-white border-b border-gray-200 sticky top-0 z-30 print:hidden">
                 <div className="container flex items-center justify-between h-16 gap-4">
-                    <div className="text-xl font-bold text-primary flex items-center gap-2">
-                        <Activity className="text-primary" size={24} /> GlucoCare <BetaBadge /> <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Espace Patient</span>
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100"
+                            onClick={() => setSidebarOpen(true)}
+                        >
+                            <Menu size={24} />
+                        </button>
+                        <div className="text-xl font-bold text-primary flex items-center gap-2">
+                            <Activity className="text-primary" size={24} /> GlucoCare <BetaBadge /> <span className="text-xs font-normal text-gray-500 hidden sm:inline-block">/ Espace Patient</span>
+                        </div>
                     </div>
-                    <RoleSwitcher />
-                    <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-red-500 gap-2">
-                        <LogOut size={16} /> <span className="hidden sm:inline">Déconnexion</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <RoleSwitcher />
+                        <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-red-500 gap-2">
+                            <LogOut size={16} /> <span className="hidden sm:inline">Deconnexion</span>
+                        </Button>
+                    </div>
                 </div>
             </nav>
 
-            <main className="container py-4 sm:py-8 px-3 sm:px-4 space-y-6 sm:space-y-8">
+            <Sidebar
+                navGroups={navGroups}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+            />
+
+            <main className="lg:ml-64 min-h-[calc(100vh-4rem)]">
+                <div className="container py-4 sm:py-8 px-3 sm:px-4 space-y-6 sm:space-y-8">
                 <Card className="bg-gradient-to-r from-primary/5 to-white border-primary/10 print:hidden">
                     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex-1">
                             <h1 className="text-2xl font-bold text-gray-900">Bonjour, {patient.name}</h1>
                             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2">
                                 <p className="text-gray-500 text-sm flex items-center gap-2">
-                                    <Clock size={14} /> Dernière visite: {patient.lastVisit}
+                                    <Clock size={14} /> Derniere visite: {patient.lastVisit}
                                 </p>
 
                                 {/* Doctor Info - Miniature */}
@@ -260,7 +329,7 @@ const PatientPortal = () => {
                                         )}
                                     </div>
                                     <div className="text-xs text-gray-600 font-medium">
-                                        {patient.doctorName || "Dr. Specialiste"}
+                                        {patient.doctorName || "Medecin traitant"}
                                     </div>
                                 </div>
                             </div>
@@ -286,182 +355,235 @@ const PatientPortal = () => {
                     </CardContent>
                 </Card>
 
-                {/* Main Navigation Tabs */}
-                <div className="flex border-b border-gray-200 overflow-x-auto pb-1 gap-1 sm:gap-4 print:hidden">
-                    {navItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id)}
-                            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap min-h-[44px] ${activeTab === item.id
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            <item.icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                            <span className="hidden sm:inline">{item.label}</span>
-                            <span className="sm:hidden">{item.label.split(' ')[0]}</span>
-                        </button>
-                    ))}
-                </div>
-
                 {activeTab === 'overview' && (
-                    <div className="space-y-6">
-                        {/* Vitals Tabs */}
-                        <div className="flex flex-wrap gap-2">
-                            {specialtyVitalTypes.map(vt => (
-                                <button
-                                    key={vt.key}
-                                    onClick={() => {
-                                        setSelectedVitalType(vt.key);
-                                        setForecast(null);
-                                    }}
-                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${selectedVitalType === vt.key
-                                        ? 'bg-primary text-white border-primary shadow-sm'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    <div className="space-y-5">
+                        {/* ── Quick Stats Row ────────────────────────────── */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {specialtyVitalTypes.slice(0, 4).map(vt => {
+                                const vtConfig = getVitalConfig(vt.key);
+                                const VtIcon = vtConfig.icon;
+                                const latest = vitals?.readings
+                                    ?.filter(v => (v.category || v.type) === vt.key)
+                                    ?.sort((a, b) => new Date(b.date) - new Date(a.date))?.[0];
+
+                                const displayVal = latest
+                                    ? (vt.chartType === 'dual'
+                                        ? `${latest[vt.chartDataKey[0]]}/${latest[vt.chartDataKey[1]]}`
+                                        : (latest[vt.chartDataKey] ?? latest.value ?? '—'))
+                                    : '—';
+
+                                const isActive = selectedVitalType === vt.key;
+
+                                return (
+                                    <button
+                                        key={vt.key}
+                                        onClick={() => { setSelectedVitalType(vt.key); setForecast(null); }}
+                                        className={`relative text-left p-3 sm:p-4 rounded-xl border transition-all ${isActive
+                                            ? 'bg-white border-primary/30 shadow-md ring-1 ring-primary/20'
+                                            : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm'
                                         }`}
-                                >
-                                    {getVitalLabelFr(vt.key)}
-                                </button>
-                            ))}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <div className={`p-1.5 rounded-lg ${isActive ? 'bg-primary/10' : 'bg-gray-50'}`}>
+                                                <VtIcon size={14} style={{ color: vtConfig.color }} />
+                                            </div>
+                                            <span className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">{getVitalLabelFr(vt.key)}</span>
+                                        </div>
+                                        <div className="text-lg sm:text-xl font-bold text-gray-900">{displayVal}</div>
+                                        <div className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                                            {latest?.date || 'Aucune donnee'}
+                                            {vt.unit && <span className="ml-1">{vt.unit}</span>}
+                                        </div>
+                                        {isActive && <div className="absolute top-0 left-0 w-full h-0.5 bg-primary rounded-t-xl" />}
+                                    </button>
+                                );
+                            })}
                         </div>
 
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    <Icon className="w-5 h-5" style={{ color: config.color }} />
-                                    Votre Tendance ({selectedVitalType})
-                                </CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsAddVitalOpen(true)}
-                                        className="text-primary border-primary/20 hover:bg-primary/5 gap-1"
-                                    >
-                                        <Plus size={16} /> <span className="hidden sm:inline">Ajouter</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleForecast}
-                                        disabled={analyzing}
-                                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                    >
-                                        <Sparkles size={14} className={`mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                                        {analyzing ? "Analyse..." : "IA"}
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                {forecast && (
-                                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-100 flex items-start gap-3">
-                                        <div className="bg-white p-2 rounded-full shadow-sm text-indigo-600">
-                                            <Sparkles size={18} />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 text-sm">Analyse IA : {forecast.trend}</h4>
-                                            <p className="text-sm text-gray-600 mt-1">{forecast.insight}</p>
-                                        </div>
+                        {/* ── Main Content: Chart + Calendar side by side ── */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                            {/* Chart — 2/3 width on desktop */}
+                            <Card className="lg:col-span-2">
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Icon className="w-5 h-5" style={{ color: config.color }} />
+                                        Tendance {getVitalLabelFr(selectedVitalType)}
+                                    </CardTitle>
+                                    <div className="flex items-center gap-1.5">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setIsAddVitalOpen(true)}
+                                            className="text-primary border-primary/20 hover:bg-primary/5 gap-1 h-8 text-xs"
+                                        >
+                                            <Plus size={14} /> <span className="hidden sm:inline">Ajouter</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleForecast}
+                                            disabled={analyzing}
+                                            className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-8 text-xs"
+                                        >
+                                            <Sparkles size={14} className={analyzing ? "animate-spin" : ""} />
+                                            <span className="ml-1">{analyzing ? "..." : "IA"}</span>
+                                        </Button>
                                     </div>
-                                )}
-
-                                <div className="h-64 sm:h-96 w-full">
-                                    {chartData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 10 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#9CA3AF' }} tickLine={false} axisLine={false} dy={10} />
-                                                <YAxis tick={{ fontSize: 12, fill: '#6B7280', fontWeight: 500 }} tickLine={false} axisLine={false} dx={-10} domain={['auto', 'auto']} />
-                                                <Tooltip
-                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                                                    cursor={{ stroke: config.color, strokeWidth: 1, strokeDasharray: '4 4' }}
-                                                    formatter={(value, name) => [`${value} ${config.unit}`, name === 'systolic' ? 'Systolique' : name === 'diastolic' ? 'Diastolique' : selectedVitalType]}
-                                                />
-                                                {(() => {
-                                                    const vtConfig = findVitalType(specialtyVitalTypes, selectedVitalType);
-                                                    if (vtConfig?.chartType === 'dual') {
-                                                        const keys = vtConfig.chartDataKey;
-                                                        return (
-                                                            <>
-                                                                <Legend verticalAlign="top" height={36} formatter={(value) => value === 'systolic' ? 'Systolique' : 'Diastolique'} />
-                                                                <Line type="monotone" dataKey={keys[0]} stroke={config.color} strokeWidth={3} dot={{ r: 5, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name={keys[0]}>
-                                                                    <LabelList dataKey={keys[0]} position="top" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: config.color }} />
-                                                                </Line>
-                                                                <Line type="monotone" dataKey={keys[1]} stroke="#818CF8" strokeWidth={3} dot={{ r: 5, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} name={keys[1]}>
-                                                                    <LabelList dataKey={keys[1]} position="bottom" offset={10} style={{ fontSize: 11, fontWeight: 600, fill: '#818CF8' }} />
-                                                                </Line>
-                                                            </>
-                                                        );
-                                                    }
-                                                    const dataKey = vtConfig?.chartDataKey || 'value';
-                                                    return (
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey={dataKey}
-                                                            stroke={config.color}
-                                                            strokeWidth={3}
-                                                            dot={(props) => {
-                                                                const { cx, cy, payload } = props;
-                                                                if (payload.type === 'predicted') {
-                                                                    return <circle cx={cx} cy={cy} r={5} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
-                                                                }
-                                                                return <circle cx={cx} cy={cy} r={5} fill={config.color} stroke="white" strokeWidth={2} />;
-                                                            }}
-                                                            activeDot={{ r: 7 }}
-                                                            strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
-                                                        >
-                                                            <LabelList dataKey={dataKey} position="top" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: config.color }} />
-                                                        </Line>
-                                                    );
-                                                })()}
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                            <Activity size={48} className="mb-4 opacity-20" />
-                                            <p>Aucune donnée disponible pour cette période.</p>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {forecast && (
+                                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-lg border border-indigo-100 flex items-start gap-2.5">
+                                            <div className="bg-white p-1.5 rounded-full shadow-sm text-indigo-600 shrink-0">
+                                                <Sparkles size={14} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-gray-900 text-xs">Analyse IA : {forecast.trend}</h4>
+                                                <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{forecast.insight}</p>
+                                            </div>
                                         </div>
                                     )}
-                                </div>
-                            </CardContent>
-                        </Card>
 
-                        {/* Recent Readings with Delete */}
+                                    <div className="h-56 sm:h-72 lg:h-80 w-full">
+                                        {chartData.length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 10 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false} dy={10} />
+                                                    <YAxis tick={{ fontSize: 11, fill: '#6B7280', fontWeight: 500 }} tickLine={false} axisLine={false} dx={-10} domain={['auto', 'auto']} />
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '10px', fontSize: '12px' }}
+                                                        cursor={{ stroke: config.color, strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                        formatter={(value, name) => [`${value} ${config.unit}`, name === 'systolic' ? 'Systolique' : name === 'diastolic' ? 'Diastolique' : getVitalLabelFr(selectedVitalType)]}
+                                                    />
+                                                    {(() => {
+                                                        const vtConfig = findVitalType(specialtyVitalTypes, selectedVitalType);
+                                                        if (vtConfig?.chartType === 'dual') {
+                                                            const keys = vtConfig.chartDataKey;
+                                                            return (
+                                                                <>
+                                                                    <Legend verticalAlign="top" height={30} formatter={(value) => value === 'systolic' ? 'Systolique' : 'Diastolique'} />
+                                                                    <Line type="monotone" dataKey={keys[0]} stroke={config.color} strokeWidth={2.5} dot={{ r: 4, fill: config.color, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name={keys[0]}>
+                                                                        <LabelList dataKey={keys[0]} position="top" offset={8} style={{ fontSize: 10, fontWeight: 600, fill: config.color }} />
+                                                                    </Line>
+                                                                    <Line type="monotone" dataKey={keys[1]} stroke="#818CF8" strokeWidth={2.5} dot={{ r: 4, fill: '#818CF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name={keys[1]}>
+                                                                        <LabelList dataKey={keys[1]} position="bottom" offset={8} style={{ fontSize: 10, fontWeight: 600, fill: '#818CF8' }} />
+                                                                    </Line>
+                                                                </>
+                                                            );
+                                                        }
+                                                        const dataKey = vtConfig?.chartDataKey || 'value';
+                                                        return (
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey={dataKey}
+                                                                stroke={config.color}
+                                                                strokeWidth={2.5}
+                                                                dot={(props) => {
+                                                                    const { cx, cy, payload } = props;
+                                                                    if (payload.type === 'predicted') {
+                                                                        return <circle cx={cx} cy={cy} r={4} fill="white" stroke={config.color} strokeWidth={2} strokeDasharray="2 2" />;
+                                                                    }
+                                                                    return <circle cx={cx} cy={cy} r={4} fill={config.color} stroke="white" strokeWidth={2} />;
+                                                                }}
+                                                                activeDot={{ r: 6 }}
+                                                                strokeDasharray={chartData.some(d => d.type === 'predicted') ? "3 3" : ""}
+                                                            >
+                                                                <LabelList dataKey={dataKey} position="top" offset={8} style={{ fontSize: 11, fontWeight: 700, fill: config.color }} />
+                                                            </Line>
+                                                        );
+                                                    })()}
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                                <Activity size={40} className="mb-3 opacity-20" />
+                                                <p className="text-sm">Aucune donnee disponible.</p>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mt-3 gap-1.5"
+                                                    onClick={() => setIsAddVitalOpen(true)}
+                                                >
+                                                    <Plus size={14} /> Ajouter votre premiere mesure
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Calendar — 1/3 width on desktop */}
+                            <div className="space-y-5">
+                                <VitalCalendar
+                                    readings={filteredVitals}
+                                    accentColor={config.color}
+                                    onDateClick={(dateStr) => {
+                                        setAddVitalDate(dateStr);
+                                        setIsAddVitalOpen(true);
+                                    }}
+                                />
+
+                                {/* Latest value highlight */}
+                                {filteredVitals.length > 0 && (() => {
+                                    const latest = filteredVitals[filteredVitals.length - 1];
+                                    const val = selectedVtConfig?.chartType === 'dual'
+                                        ? `${latest[selectedVtConfig.chartDataKey[0]]}/${latest[selectedVtConfig.chartDataKey[1]]}`
+                                        : (latest[selectedVtConfig?.chartDataKey] ?? latest.value);
+                                    return (
+                                        <Card className="border-l-4" style={{ borderLeftColor: config.color }}>
+                                            <CardContent className="p-4">
+                                                <div className="text-xs font-medium text-gray-500 mb-1">Derniere mesure</div>
+                                                <div className="text-2xl font-bold text-gray-900">{val} <span className="text-sm font-normal text-gray-400">{config.unit}</span></div>
+                                                <div className="text-xs text-gray-400 mt-1">{latest.date}{latest.subtype ? ` · ${latest.subtype}` : ''}</div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+
+                        {/* ── Recent Readings Table ──────────────────────── */}
                         {filteredVitals.length > 0 && (
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-sm font-semibold text-gray-700">Dernières mesures</CardTitle>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+                                        <span>Historique des mesures</span>
+                                        <Badge variant="info" className="text-[10px]">{filteredVitals.length} mesure{filteredVitals.length > 1 ? 's' : ''}</Badge>
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-0">
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left">
                                             <thead>
-                                                <tr className="bg-gray-50 border-b border-gray-200">
-                                                    <th className="p-3 font-semibold text-gray-600 text-xs">Date</th>
-                                                    <th className="p-3 font-semibold text-gray-600 text-xs">Détail</th>
-                                                    <th className="p-3 font-semibold text-gray-600 text-xs">Valeur ({config.unit})</th>
-                                                    <th className="p-3 font-semibold text-gray-600 text-xs w-12"></th>
+                                                <tr className="bg-gray-50/80 border-b border-gray-200">
+                                                    <th className="px-4 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">Date</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">Detail</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">Valeur</th>
+                                                    <th className="px-4 py-2.5 w-10"></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {filteredVitals.slice().reverse().map((reading) => (
-                                                    <tr key={reading.id} className="border-b border-gray-100 last:border-0 hover:bg-slate-50">
-                                                        <td className="p-3 text-gray-700 text-xs sm:text-sm">{reading.date}</td>
-                                                        <td className="p-3 text-gray-500 text-xs sm:text-sm">
-                                                            {selectedVtConfig?.extras?.subtypes ? (reading.subtype || reading.type || 'Standard') : '-'}
+                                                {filteredVitals.slice().reverse().slice(0, 10).map((reading) => (
+                                                    <tr key={reading.id} className="border-b border-gray-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-4 py-2.5 text-gray-700 text-xs sm:text-sm font-medium">{reading.date}</td>
+                                                        <td className="px-4 py-2.5 text-gray-500 text-xs sm:text-sm">
+                                                            {selectedVtConfig?.extras?.subtypes ? (reading.subtype || reading.type || 'Standard') : '—'}
                                                         </td>
-                                                        <td className="p-3 font-medium text-gray-900 text-xs sm:text-sm">
-                                                            {selectedVtConfig?.chartType === 'dual'
-                                                                ? `${reading[selectedVtConfig.chartDataKey[0]]}/${reading[selectedVtConfig.chartDataKey[1]]}`
-                                                                : (reading[selectedVtConfig?.chartDataKey] || reading.value)}
+                                                        <td className="px-4 py-2.5 text-xs sm:text-sm">
+                                                            <span className="font-semibold text-gray-900">
+                                                                {selectedVtConfig?.chartType === 'dual'
+                                                                    ? `${reading[selectedVtConfig.chartDataKey[0]]}/${reading[selectedVtConfig.chartDataKey[1]]}`
+                                                                    : (reading[selectedVtConfig?.chartDataKey] || reading.value)}
+                                                            </span>
+                                                            <span className="text-gray-400 ml-1 text-[10px]">{config.unit}</span>
                                                         </td>
-                                                        <td className="p-3">
+                                                        <td className="px-4 py-2.5">
                                                             <button
                                                                 onClick={() => handleDeleteVital(reading.id)}
-                                                                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
-                                                                title="Supprimer cette mesure"
+                                                                className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                                                                title="Supprimer"
                                                             >
-                                                                <Trash2 size={14} />
+                                                                <Trash2 size={13} />
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -549,11 +671,7 @@ const PatientPortal = () => {
                         <div className="space-y-6">
                             <PaymentForm
                                 doctorId={patient.doctorId}
-                                onSuccess={() => {
-                                    // Trigger refresh of payment history logic if we had it lifted up
-                                    // For now, we rely on the component mount or we can force reload
-                                    window.location.reload();
-                                }} />
+                                onSuccess={refreshData} />
                         </div>
                         <div className="space-y-6">
                             <PaymentHistoryList patientId={patientId} currentUser={currentUser} />
@@ -572,7 +690,7 @@ const PatientPortal = () => {
                                 <ChatInterface
                                     currentUser={{ ...currentUser, publicId: patientId }}
                                     contactId={patient.doctorId || "SPECIALIST"} // Use actual doctor ID if available
-                                    contactName={patient.doctorName || "Dr. Specialist"}
+                                    contactName={patient.doctorName || "Médecin traitant"}
                                 />
                             </div>
                         </Card>
@@ -583,20 +701,39 @@ const PatientPortal = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <CaregiverInviteForm
                             patientId={patientId}
-                            onSuccess={() => {
-                                // Refresh caregiver list
-                                window.location.reload();
-                            }}
+                            onSuccess={refreshData}
                         />
                         <CaregiverList
                             patientId={patientId}
-                            onUpdate={() => {
-                                // Refresh data
-                                window.location.reload();
-                            }}
+                            onUpdate={refreshData}
                         />
                     </div>
                 )}
+
+                {activeTab === 'medications' && (
+                    <MedicationScheduleManager
+                        patientId={patientId}
+                        currentUser={currentUser}
+                        isDoctor={false}
+                    />
+                )}
+
+                {activeTab === 'settings' && (
+                    <NotificationPreferences
+                        patientId={patientId}
+                        currentUser={currentUser}
+                    />
+                )}
+
+                {activeTab === 'profile' && (
+                    <PatientProfile
+                        patient={patient}
+                        currentUser={currentUser}
+                        patientId={patientId}
+                        onUpdate={refreshData}
+                    />
+                )}
+                </div>
             </main>
 
             {/* AI Assistant */}
@@ -607,12 +744,14 @@ const PatientPortal = () => {
                     patientId={patientId}
                     currentUser={currentUser}
                     initialType={selectedVitalType}
+                    initialDate={addVitalDate}
                     vitalTypes={specialtyVitalTypes}
                     onSuccess={() => {
                         setIsAddVitalOpen(false);
-                        window.location.reload(); // Simple reload to fetch new data
+                        setAddVitalDate(null);
+                        refreshData();
                     }}
-                    onCancel={() => setIsAddVitalOpen(false)}
+                    onCancel={() => { setIsAddVitalOpen(false); setAddVitalDate(null); }}
                 />
             )}
         </div>
@@ -640,7 +779,10 @@ const AppointmentRequestForm = ({ patientId, patientName, doctorId, currentUser 
             setSlotsMessage('');
             setFormData(prev => ({ ...prev, time: '' }));
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/doctors/${doctorId}/slots?date=${formData.date}`);
+                const token = await currentUser.getIdToken();
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/doctors/${doctorId}/slots?date=${formData.date}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const data = await res.json();
                 setSlots(data.slots || []);
                 if (data.message) setSlotsMessage(data.message);
@@ -723,11 +865,10 @@ const AppointmentRequestForm = ({ patientId, patientName, doctorId, currentUser 
                                             key={slot}
                                             type="button"
                                             onClick={() => setFormData(prev => ({ ...prev, time: slot }))}
-                                            className={`py-2 px-1 text-sm rounded-md border transition-colors ${
-                                                formData.time === slot
-                                                    ? 'bg-primary text-white border-primary'
-                                                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:text-primary'
-                                            }`}
+                                            className={`py-2 px-1 text-sm rounded-md border transition-colors ${formData.time === slot
+                                                ? 'bg-primary text-white border-primary'
+                                                : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:text-primary'
+                                                }`}
                                         >
                                             {slot}
                                         </button>
@@ -841,7 +982,7 @@ const AppointmentList = ({ patientId, currentUser }) => {
                                             <span className="text-gray-400 font-normal text-sm">•</span>
                                             <span className="text-gray-600 font-normal text-sm">{apt.reason}</span>
                                         </div>
-                                        <div className="text-xs text-gray-400 mt-1">Dr. Specialist</div>
+                                        <div className="text-xs text-gray-400 mt-1">{apt.doctorName || "Médecin traitant"}</div>
                                     </div>
                                 </div>
                                 <Badge variant={
@@ -922,14 +1063,113 @@ const PaymentHistoryList = ({ patientId, currentUser }) => {
     );
 };
 
-// ... (existing code)
+// ─── Vital Calendar ─────────────────────────────────────────────────
+const MONTH_NAMES_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const DAY_HEADERS = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
 
-const AddVitalForm = ({ patientId, currentUser, onSuccess, onCancel, initialType = 'Glucose', vitalTypes = DEFAULT_VITAL_TYPES }) => {
+const VitalCalendar = ({ readings = [], accentColor = '#3b82f6', onDateClick }) => {
+    const [viewDate, setViewDate] = useState(new Date());
+
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    // Build set of dates that have readings (YYYY-MM-DD)
+    const readingDates = new Set();
+    readings.forEach(r => { if (r.date) readingDates.add(r.date); });
+
+    // First day of month (0=Sun) → shift to Monday-start
+    const firstDay = new Date(year, month, 1);
+    const startDow = (firstDay.getDay() + 6) % 7; // 0=Mon
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+    const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+
+    // Build grid cells: leading blanks + day numbers
+    const cells = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+    return (
+        <Card>
+            <CardContent className="p-4">
+                {/* Month nav */}
+                <div className="flex items-center justify-between mb-3">
+                    <button onClick={prevMonth} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                        <ChevronLeft size={18} />
+                    </button>
+                    <h4 className="text-sm font-semibold text-gray-800">
+                        {MONTH_NAMES_FR[month]} {year}
+                    </h4>
+                    <button onClick={nextMonth} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                        <ChevronRight size={18} />
+                    </button>
+                </div>
+
+                {/* Day headers */}
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                    {DAY_HEADERS.map(d => (
+                        <div key={d} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">{d}</div>
+                    ))}
+                </div>
+
+                {/* Day cells */}
+                <div className="grid grid-cols-7 gap-1">
+                    {cells.map((day, i) => {
+                        if (day === null) return <div key={`blank-${i}`} />;
+
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const hasReading = readingDates.has(dateStr);
+                        const isToday = dateStr === todayStr;
+                        const isFuture = dateStr > todayStr;
+
+                        return (
+                            <button
+                                key={dateStr}
+                                onClick={() => !isFuture && onDateClick?.(dateStr)}
+                                disabled={isFuture}
+                                className={`relative flex flex-col items-center justify-center h-9 sm:h-10 rounded-lg text-xs sm:text-sm transition-all
+                                    ${isFuture ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer'}
+                                    ${isToday ? 'ring-2 ring-primary/40 font-bold text-primary' : 'text-gray-700'}
+                                    ${hasReading ? 'font-semibold' : ''}
+                                `}
+                            >
+                                {day}
+                                {hasReading && (
+                                    <span
+                                        className="absolute bottom-1 w-1.5 h-1.5 rounded-full"
+                                        style={{ backgroundColor: accentColor }}
+                                    />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
+                        Mesure existante
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <Plus size={10} />
+                        Cliquez pour ajouter
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+const AddVitalForm = ({ patientId, currentUser, onSuccess, onCancel, initialType = 'Glucose', initialDate, vitalTypes = DEFAULT_VITAL_TYPES }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [type, setType] = useState(initialType);
     const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
+        date: initialDate || new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().slice(0, 5),
         value: '',
         systolic: '',

@@ -76,9 +76,9 @@ const LandingPage = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/80 to-slate-900/30 z-10" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent z-10" />
                 <img
-                    src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=2053"
-                    alt="Équipe Médicale GlucoSoin"
-                    className="absolute inset-0 w-full h-full object-cover opacity-50"
+                    src="/images/limete-tower.jpg"
+                    alt="Tour de l'Échangeur de Limete — Kinshasa, RDC"
+                    className="absolute inset-0 w-full h-full object-cover opacity-40"
                     loading="eager"
                 />
 

@@ -20,6 +20,20 @@ export default {
                 sm: 'var(--shadow-sm)',
                 md: 'var(--shadow-md)',
                 lg: 'var(--shadow-lg)',
+            },
+            keyframes: {
+                'slide-in': {
+                    '0%': { transform: 'translateX(100%)', opacity: '0' },
+                    '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
+                'slide-in-left': {
+                    '0%': { transform: 'translateX(-100%)', opacity: '0' },
+                    '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
+            },
+            animation: {
+                'slide-in': 'slide-in 0.3s ease-out',
+                'slide-in-left': 'slide-in-left 0.3s ease-out',
             }
         },
     },

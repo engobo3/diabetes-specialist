@@ -89,7 +89,7 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
             const myId = customSenderId || (currentUser?.publicId) || safeUser.uid;
             const senderId = myId;
             const receiverId = contactId;
-            const senderName = customSenderName || (isSpecialist ? (currentUser?.displayName || 'Dr. Specialist') : (safeUser.displayName || safeUser.email));
+            const senderName = customSenderName || (isSpecialist ? (currentUser?.displayName || 'Médecin traitant') : (safeUser.displayName || safeUser.email));
 
             // Validate before sending
             if (!senderId || !receiverId) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Check, CheckCheck, Calendar, Activity, AlertCircle } from 'lucide-react';
+import { Bell, Check, CheckCheck, Calendar, Activity, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const TYPE_CONFIG = {
@@ -8,6 +8,8 @@ const TYPE_CONFIG = {
     appointment_rejected: { icon: Calendar, color: 'text-red-500', bg: 'bg-red-50' },
     appointment_reminder: { icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-50' },
     vital_reminder: { icon: Activity, color: 'text-purple-500', bg: 'bg-purple-50' },
+    vital_escalation: { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50' },
+    medication_reminder: { icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
     new_patient_data: { icon: Activity, color: 'text-teal-500', bg: 'bg-teal-50' },
     system: { icon: AlertCircle, color: 'text-gray-500', bg: 'bg-gray-50' }
 };
@@ -88,8 +90,10 @@ const NotificationBell = () => {
             });
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
             setUnreadCount(prev => Math.max(0, prev - 1));
-        } catch (err) {
-            // silent
+        } catch {
+            // Best-effort: revert optimistic update on failure
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: false } : n));
+            setUnreadCount(prev => prev + 1);
         }
     };
 
@@ -102,8 +106,8 @@ const NotificationBell = () => {
             });
             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
             setUnreadCount(0);
-        } catch (err) {
-            // silent
+        } catch {
+            // Best-effort: no revert needed, user can retry
         }
     };
 

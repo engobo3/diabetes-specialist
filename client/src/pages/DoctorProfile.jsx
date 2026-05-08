@@ -14,11 +14,6 @@ const DoctorProfile = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Debug logging
-    useEffect(() => {
-        console.log('DoctorProfile - userRole:', userRole, 'currentUser:', currentUser?.email, 'doctorProfile:', doctorProfile);
-    }, [userRole, currentUser, doctorProfile]);
-
     useEffect(() => {
         const fetchDoctor = async () => {
             try {

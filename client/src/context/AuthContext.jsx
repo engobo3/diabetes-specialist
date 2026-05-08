@@ -138,7 +138,6 @@ export const AuthProvider = ({ children }) => {
                                 defaultRole = 'caregiver';
                                 defaultPatientId = caregiverPatients[0].id;
                             }
-                            console.log("Caregiver found with", caregiverPatients.length, "patients");
                         }
                     }
 
@@ -177,8 +176,6 @@ export const AuthProvider = ({ children }) => {
                     setActiveRole(defaultRole);
                     setUserRole(defaultRole); // Backward compatibility
                     setPatientId(defaultPatientId);
-
-                    console.log('User roles detected:', roles, 'Active:', defaultRole);
 
                     // If no roles found, default to doctor (legacy behavior)
                     if (roles.length === 0) {

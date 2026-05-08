@@ -37,4 +37,9 @@ try {
     console.error('Error initializing Firebase:', error);
 }
 
+if (!db) {
+    console.error('FATAL: Firebase Firestore (db) could not be initialized. The server will not function correctly.');
+    console.error('Ensure either FIREBASE_SERVICE_ACCOUNT env var or server/config/serviceAccountKey.json is present.');
+}
+
 module.exports = { db };

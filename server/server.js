@@ -75,6 +75,9 @@ app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/foot-risk', require('./routes/footRiskRoutes'));
 app.use('/api/specialties', require('./routes/specialtyRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/doctor-events', require('./routes/doctorEventRoutes'));
+app.use('/api/notification-preferences', require('./routes/notificationPreferencesRoutes'));
+app.use('/api/medication-schedules', require('./routes/medicationScheduleRoutes'));
 
 // Global error handler — must be after all route mounts
 app.use((err, req, res, next) => {
@@ -118,26 +121,58 @@ exports.morningVitalReminder = onSchedule({
     const admin = require('firebase-admin');
 
     try {
-        const snapshot = await db.collection('patients').get();
         let sent = 0;
+        const BATCH_SIZE = 500;
+        let lastDoc = null;
 
-        for (const doc of snapshot.docs) {
-            const patient = doc.data();
-            if (!patient.email) continue;
+        while (true) {
+            let query = db.collection('patients').limit(BATCH_SIZE);
+            if (lastDoc) query = query.startAfter(lastDoc);
+            const snapshot = await query.get();
 
-            try {
-                const firebaseUser = await admin.auth().getUserByEmail(patient.email);
-                await createNotification({
-                    userId: firebaseUser.uid,
-                    type: 'vital_reminder',
-                    title: 'Rappel: Saisir vos mesures',
-                    body: 'Bonjour! N\'oubliez pas de saisir vos mesures du matin (glycémie, tension, etc.).',
-                    data: { patientId: doc.id }
-                });
-                sent++;
-            } catch (err) {
-                // Patient may not have a Firebase account — skip
+            if (snapshot.empty) break;
+            lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            for (const doc of snapshot.docs) {
+                const patient = doc.data();
+                if (!patient.email) continue;
+
+                try {
+                    // Check patient preferences — skip if vital reminders disabled
+                    const prefsDoc = await db.collection('notification_preferences')
+                        .doc(doc.id).get();
+                    if (prefsDoc.exists && prefsDoc.data().vitalReminderEnabled === false) continue;
+
+                    // Check if patient already logged vitals today — skip if so
+                    const vitalsSnap = await db.collection('patients')
+                        .doc(doc.id)
+                        .collection('vitals')
+                        .orderBy('date', 'desc')
+                        .limit(1)
+                        .get();
+
+                    if (!vitalsSnap.empty) {
+                        const latestDate = vitalsSnap.docs[0].data().date;
+                        if (latestDate && latestDate.startsWith(todayStr)) continue;
+                    }
+
+                    const firebaseUser = await admin.auth().getUserByEmail(patient.email);
+                    await createNotification({
+                        userId: firebaseUser.uid,
+                        type: 'vital_reminder',
+                        title: 'Rappel: Saisir vos mesures',
+                        body: 'Bonjour! N\'oubliez pas de saisir vos mesures du matin (glycémie, tension, etc.).',
+                        data: { patientId: doc.id, period: 'morning' }
+                    });
+                    sent++;
+                } catch (err) {
+                    // Patient may not have a Firebase account — skip
+                }
             }
+
+            if (snapshot.docs.length < BATCH_SIZE) break;
         }
 
         console.log(`morningVitalReminder: sent ${sent} notifications`);
@@ -216,5 +251,244 @@ exports.appointmentReminder = onSchedule({
         console.log(`appointmentReminder: sent ${sent} notifications`);
     } catch (error) {
         console.error('appointmentReminder error:', error);
+    }
+});
+
+// Evening vital reminder: 7:00 PM Africa/Kinshasa daily (opt-in only)
+exports.eveningVitalReminder = onSchedule({
+    schedule: '0 19 * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    const { db } = require('./config/firebaseConfig');
+    const { createNotification } = require('./services/notificationService');
+    const admin = require('firebase-admin');
+
+    try {
+        let sent = 0;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // Only query patients who opted in to evening reminders
+        const prefsSnap = await db.collection('notification_preferences')
+            .where('eveningReminderEnabled', '==', true)
+            .get();
+
+        if (prefsSnap.empty) {
+            console.log('eveningVitalReminder: no patients with evening reminders enabled');
+            return;
+        }
+
+        for (const prefsDoc of prefsSnap.docs) {
+            const patientId = prefsDoc.id;
+
+            try {
+                // Check if patient already logged vitals today
+                const vitalsSnap = await db.collection('patients')
+                    .doc(patientId)
+                    .collection('vitals')
+                    .orderBy('date', 'desc')
+                    .limit(1)
+                    .get();
+
+                if (!vitalsSnap.empty) {
+                    const latestDate = vitalsSnap.docs[0].data().date;
+                    if (latestDate && latestDate.startsWith(todayStr)) continue;
+                }
+
+                // Get patient email -> Firebase UID
+                const patientDoc = await db.collection('patients')
+                    .doc(patientId).get();
+                if (!patientDoc.exists) continue;
+                const patient = patientDoc.data();
+                if (!patient.email) continue;
+
+                const fbUser = await admin.auth().getUserByEmail(patient.email);
+                await createNotification({
+                    userId: fbUser.uid,
+                    type: 'vital_reminder',
+                    title: 'Rappel du soir: Saisir vos mesures',
+                    body: 'Bonsoir! N\'oubliez pas de saisir vos mesures du soir (glycemie, tension, etc.).',
+                    data: { patientId, period: 'evening' }
+                });
+                sent++;
+            } catch (err) {
+                // skip individual patient errors
+            }
+        }
+
+        console.log(`eveningVitalReminder: sent ${sent} notifications`);
+    } catch (error) {
+        console.error('eveningVitalReminder error:', error);
+    }
+});
+
+// Vital escalation: 10:00 AM daily — alert doctors if patient hasn't logged vitals in N days
+exports.vitalEscalationCheck = onSchedule({
+    schedule: '0 10 * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    const { db } = require('./config/firebaseConfig');
+    const { createNotification } = require('./services/notificationService');
+    const admin = require('firebase-admin');
+
+    try {
+        let sent = 0;
+        const BATCH_SIZE = 500;
+        let lastDoc = null;
+
+        while (true) {
+            let query = db.collection('patients').limit(BATCH_SIZE);
+            if (lastDoc) query = query.startAfter(lastDoc);
+            const snapshot = await query.get();
+
+            if (snapshot.empty) break;
+            lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+            for (const doc of snapshot.docs) {
+                const patient = doc.data();
+
+                try {
+                    // Check preferences — skip if escalation disabled
+                    const prefsDoc = await db.collection('notification_preferences')
+                        .doc(doc.id).get();
+                    const escalationDays = prefsDoc.exists
+                        ? (prefsDoc.data().escalationDays || 3)
+                        : 3;
+                    const escalationEnabled = prefsDoc.exists
+                        ? (prefsDoc.data().escalationEnabled !== false)
+                        : true;
+
+                    if (!escalationEnabled) continue;
+
+                    // Check latest vital
+                    const vitalsSnap = await db.collection('patients')
+                        .doc(doc.id)
+                        .collection('vitals')
+                        .orderBy('date', 'desc')
+                        .limit(1)
+                        .get();
+
+                    let daysSinceLastVital = Infinity;
+                    if (!vitalsSnap.empty) {
+                        const lastVitalDate = new Date(vitalsSnap.docs[0].data().date);
+                        daysSinceLastVital = Math.floor(
+                            (Date.now() - lastVitalDate.getTime()) / (1000 * 60 * 60 * 24)
+                        );
+                    }
+
+                    if (daysSinceLastVital < escalationDays) continue;
+
+                    // Resolve doctor IDs
+                    const doctorIds = new Set();
+                    if (patient.doctorIds && Array.isArray(patient.doctorIds)) {
+                        patient.doctorIds.forEach(id => doctorIds.add(String(id)));
+                    }
+                    if (patient.doctorId) doctorIds.add(String(patient.doctorId));
+
+                    if (doctorIds.size === 0) continue;
+
+                    // Notify each doctor
+                    for (const doctorId of doctorIds) {
+                        try {
+                            const doctorDoc = await db.collection('doctors')
+                                .doc(doctorId).get();
+                            if (!doctorDoc.exists) continue;
+                            const doctor = doctorDoc.data();
+                            const email = doctor.contact?.email || doctor.email;
+                            if (!email) continue;
+
+                            const fbUser = await admin.auth().getUserByEmail(email);
+                            await createNotification({
+                                userId: fbUser.uid,
+                                type: 'vital_escalation',
+                                title: 'Alerte: Patient sans mesures',
+                                body: `${patient.name} n'a pas saisi de mesures depuis ${daysSinceLastVital === Infinity ? 'jamais' : daysSinceLastVital + ' jours'}.`,
+                                data: { patientId: doc.id, daysMissing: String(daysSinceLastVital) }
+                            });
+                            sent++;
+                        } catch (err) {
+                            // Doctor may not have Firebase account — skip
+                        }
+                    }
+                } catch (err) {
+                    // skip individual patient errors
+                }
+            }
+
+            if (snapshot.docs.length < BATCH_SIZE) break;
+        }
+
+        console.log(`vitalEscalationCheck: sent ${sent} notifications`);
+    } catch (error) {
+        console.error('vitalEscalationCheck error:', error);
+    }
+});
+
+// Medication reminder: runs every hour, checks schedules due
+exports.medicationReminder = onSchedule({
+    schedule: '0 * * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    const { db } = require('./config/firebaseConfig');
+    const { createNotification } = require('./services/notificationService');
+    const admin = require('firebase-admin');
+
+    try {
+        let sent = 0;
+        const now = new Date();
+        const currentHour = String(now.getHours()).padStart(2, '0');
+        const todayStr = now.toISOString().split('T')[0];
+
+        // Get all active medication schedules
+        const schedulesSnap = await db.collection('medication_schedules')
+            .where('active', '==', true)
+            .get();
+
+        for (const schedDoc of schedulesSnap.docs) {
+            const schedule = schedDoc.data();
+
+            // Check date bounds
+            if (schedule.endDate && schedule.endDate < todayStr) continue;
+            if (schedule.startDate > todayStr) continue;
+
+            // Check if any scheduled time matches current hour
+            const matchingTime = schedule.times?.find(
+                t => t.startsWith(currentHour + ':')
+            );
+            if (!matchingTime) continue;
+
+            // Check patient preferences
+            const patientId = String(schedule.patientId);
+            try {
+                const prefsDoc = await db.collection('notification_preferences')
+                    .doc(patientId).get();
+                if (prefsDoc.exists && prefsDoc.data().medicationReminderEnabled === false) continue;
+
+                const patientDoc = await db.collection('patients')
+                    .doc(patientId).get();
+                if (!patientDoc.exists) continue;
+                const patient = patientDoc.data();
+                if (!patient.email) continue;
+
+                const fbUser = await admin.auth().getUserByEmail(patient.email);
+                await createNotification({
+                    userId: fbUser.uid,
+                    type: 'medication_reminder',
+                    title: `Rappel: ${schedule.medication}`,
+                    body: `Il est l'heure de prendre ${schedule.medication} (${schedule.dosage}). Heure prevue: ${matchingTime}.`,
+                    data: {
+                        patientId,
+                        medicationScheduleId: schedDoc.id,
+                        medication: schedule.medication
+                    }
+                });
+                sent++;
+            } catch (err) {
+                // skip
+            }
+        }
+
+        console.log(`medicationReminder: sent ${sent} notifications`);
+    } catch (error) {
+        console.error('medicationReminder error:', error);
     }
 });
