@@ -13,6 +13,27 @@ const PatientSchema = z.object({
     doctorIds: z.array(z.union([z.string(), z.number()])).optional(),
     uid: z.string().optional(), // Firebase Auth UID
 
+    // Clinical context — optional free-form fields used in chart and AI summaries
+    notes: z.string().max(8000).optional(),
+    gender: z.enum(['male', 'female', 'other', 'unknown', 'Male', 'Female', 'Other', '']).optional(),
+    dateOfBirth: z.string().optional(),
+    bloodType: z.string().max(8).optional(),
+    height: z.union([z.string(), z.number()]).optional(),
+    weight: z.union([z.string(), z.number()]).optional(),
+    address: z.string().max(512).optional(),
+    city: z.string().max(128).optional(),
+    conditions: z.array(z.string().max(256)).max(50).optional(),
+    allergies: z.array(z.string().max(256)).max(50).optional(),
+    emergencyContact: z.object({
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        relationship: z.string().optional()
+    }).optional(),
+    insurance: z.object({
+        provider: z.string().optional(),
+        policyNumber: z.string().optional()
+    }).optional(),
+
     // Activation code system
     activationCode: z.string().length(6).nullable().optional(),
     activationCodeExpiry: z.string().nullable().optional(),

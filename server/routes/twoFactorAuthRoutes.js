@@ -6,47 +6,39 @@ const express = require('express');
 const router = express.Router();
 const twoFactorAuthController = require('../controllers/twoFactorAuthController');
 const verifyToken = require('../middleware/authMiddleware');
+const { validateBody } = require('../middleware/validationMiddleware');
+const {
+    TwoFactorVerifySchema,
+    TwoFactorTokenOnlySchema,
+    TwoFactorDisableSchema
+} = require('../schemas/auth.schema');
 
-/**
- * @route   POST /api/2fa/setup
- * @desc    Initiate 2FA setup - generate secret and QR code
- * @access  Private (requires authentication)
- */
 router.post('/setup', verifyToken, twoFactorAuthController.setup2FA);
 
-/**
- * @route   POST /api/2fa/verify-setup
- * @desc    Verify and enable 2FA after scanning QR code
- * @access  Private (requires authentication)
- */
-router.post('/verify-setup', verifyToken, twoFactorAuthController.verifyAndEnable2FA);
+router.post('/verify-setup',
+    verifyToken,
+    validateBody(TwoFactorTokenOnlySchema),
+    twoFactorAuthController.verifyAndEnable2FA
+);
 
-/**
- * @route   POST /api/2fa/verify
- * @desc    Verify 2FA code during login (public - called before auth)
- * @access  Public
- */
-router.post('/verify', twoFactorAuthController.verify2FA);
+// Public — called BEFORE the user's session is established, so no verifyToken
+router.post('/verify',
+    validateBody(TwoFactorVerifySchema),
+    twoFactorAuthController.verify2FA
+);
 
-/**
- * @route   POST /api/2fa/disable
- * @desc    Disable 2FA for user account
- * @access  Private (requires authentication + password + 2FA token)
- */
-router.post('/disable', verifyToken, twoFactorAuthController.disable2FA);
+router.post('/disable',
+    verifyToken,
+    validateBody(TwoFactorDisableSchema),
+    twoFactorAuthController.disable2FA
+);
 
-/**
- * @route   GET /api/2fa/status
- * @desc    Get current 2FA status for user
- * @access  Private (requires authentication)
- */
 router.get('/status', verifyToken, twoFactorAuthController.get2FAStatus);
 
-/**
- * @route   POST /api/2fa/regenerate-backup-codes
- * @desc    Regenerate backup codes (requires 2FA token)
- * @access  Private (requires authentication + 2FA token)
- */
-router.post('/regenerate-backup-codes', verifyToken, twoFactorAuthController.regenerateBackupCodes);
+router.post('/regenerate-backup-codes',
+    verifyToken,
+    validateBody(TwoFactorTokenOnlySchema),
+    twoFactorAuthController.regenerateBackupCodes
+);
 
 module.exports = router;

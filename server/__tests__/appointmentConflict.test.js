@@ -2,7 +2,12 @@ const request = require('supertest');
 
 // --- Mock auth middleware ---
 jest.mock('../middleware/authMiddleware', () => (req, res, next) => {
-    req.user = { uid: 'test_uid', email: 'test@example.com' };
+    req.user = {
+        uid: 'test_uid',
+        email: 'test@example.com',
+        role: 'doctor',
+        doctorId: 'test_uid'
+    };
     next();
 });
 
@@ -247,7 +252,10 @@ describe('Appointment Conflict Detection', () => {
                 .send({ status: 'invalid_status' });
 
             expect(res.statusCode).toBe(400);
-            expect(res.body.message).toMatch(/Invalid status/i);
+            // New format: structured Zod validation error with details
+            expect(res.body.error).toBe('Validation Failed');
+            const statusIssue = (res.body.details || []).find(d => d.path === 'status');
+            expect(statusIssue).toBeDefined();
         });
 
         it('accepts valid status values', async () => {

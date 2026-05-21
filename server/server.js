@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 require('dotenv').config();
+
+const { logError } = require('./utils/safeLogger');
+const { safeErrorMessage } = require('./utils/safeError');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -8,6 +12,22 @@ const PORT = process.env.PORT || 5000;
 // Trust first proxy (Firebase Cloud Functions / Cloud Run)
 // Ensures req.ip returns the real client IP for rate limiting
 app.set('trust proxy', 1);
+
+// Fail fast on missing production secrets — better than running with insecure defaults
+if (process.env.NODE_ENV === 'production') {
+    const requiredInProd = ['FIREBASE_SERVICE_ACCOUNT'];
+    const missing = requiredInProd.filter(k => !process.env[k]);
+    if (missing.length) {
+        console.error(`FATAL: required env vars missing in production: ${missing.join(', ')}`);
+        process.exit(1);
+    }
+}
+
+// Note on CSRF: this API authenticates exclusively with `Authorization: Bearer <token>`
+// (Firebase ID tokens) and the optional `x-session-id` header. Neither is sent
+// automatically by browsers on cross-origin requests, so traditional CSRF attacks
+// do not apply. If session cookies are added later, install `cookie-parser` and a
+// double-submit-cookie / SameSite=strict scheme before relying on cookie auth.
 
 // Security middleware
 const {
@@ -22,6 +42,17 @@ const {
 app.use(enforceHTTPS); // Enforce HTTPS in production
 app.use(securityHeaders); // Add security headers
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 1000 })); // General rate limit
+
+// Attach a request ID so logs can be correlated without including PHI.
+app.use((req, res, next) => {
+    const incoming = req.headers['x-request-id'];
+    const id = (typeof incoming === 'string' && /^[\w-]{8,128}$/.test(incoming))
+        ? incoming
+        : crypto.randomUUID();
+    req.requestId = id;
+    res.setHeader('X-Request-Id', id);
+    next();
+});
 
 // CORS: restrict to known origins
 const allowedOrigins = [
@@ -79,18 +110,28 @@ app.use('/api/doctor-events', require('./routes/doctorEventRoutes'));
 app.use('/api/notification-preferences', require('./routes/notificationPreferencesRoutes'));
 app.use('/api/medication-schedules', require('./routes/medicationScheduleRoutes'));
 
-// Global error handler — must be after all route mounts
+// Global error handler — must be after all route mounts.
+// Never leak stack traces, request bodies, or upstream error details to the
+// client. Log a safe summary with the request ID so the entry can be cross-
+// referenced without exposing PHI.
 app.use((err, req, res, next) => {
     // CORS rejection from origin callback
     if (err.message === 'Not allowed by CORS') {
         return res.status(403).json({ error: 'Origin not allowed' });
     }
 
-    console.error('Unhandled error:', err);
+    logError('unhandled-error', err, {
+        requestId: req.requestId,
+        method: req.method,
+        path: req.path,
+        userId: req.user?.uid || 'anonymous',
+        userRole: req.user?.role || 'unknown'
+    });
 
-    const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-    res.status(err.status || 500).json({
-        error: isDev ? err.message : 'Internal server error',
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({
+        error: status >= 500 ? 'Internal server error' : safeErrorMessage(err),
+        requestId: req.requestId
     });
 });
 
@@ -420,6 +461,38 @@ exports.vitalEscalationCheck = onSchedule({
         console.log(`vitalEscalationCheck: sent ${sent} notifications`);
     } catch (error) {
         console.error('vitalEscalationCheck error:', error);
+    }
+});
+
+// Breach detection: 06:00 Africa/Kinshasa daily. Scans the last 24h of audit
+// logs for anomalies (bulk PHI access, mass exports, RBAC denial spikes,
+// off-hours patterns) and writes SECURITY events / fires alerts.
+exports.breachDetectionDaily = onSchedule({
+    schedule: '0 6 * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    const { runDetection } = require('./services/breachDetector');
+    try {
+        const findings = await runDetection();
+        console.log(`breachDetectionDaily: ${findings.length} findings emitted`);
+    } catch (error) {
+        console.error('breachDetectionDaily error:', error.message);
+    }
+});
+
+// Data retention: 03:00 Africa/Kinshasa every Sunday. Purges audit_logs > 6yr,
+// invalidated sessions > 30d, terminal invitations > 1yr. HIPAA requires the
+// 6-year minimum but no maximum, so we delete the moment we're allowed.
+exports.retentionWeekly = onSchedule({
+    schedule: '0 3 * * 0',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    const { runAllRetention } = require('./services/retentionService');
+    try {
+        const result = await runAllRetention();
+        console.log('retentionWeekly result:', JSON.stringify(result));
+    } catch (error) {
+        console.error('retentionWeekly error:', error.message);
     }
 });
 

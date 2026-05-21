@@ -1,13 +1,18 @@
 const request = require('supertest');
 const { app } = require('../server');
 
-// Mock the auth middleware
+// Mock the auth middleware. The test exercises mixed routes — some patient-scoped,
+// some doctor/admin-only. We default to 'doctor' so all RBAC checks pass; tests
+// that specifically want a patient role override the header.
 jest.mock('../middleware/authMiddleware', () => (req, res, next) => {
   if (req.headers['authorization']) {
+    const roleHeader = req.headers['x-test-role'];
     req.user = {
+      uid: 'test_user_uid',
       email: 'test@example.com',
-      role: 'patient',
-      patientId: 1
+      role: roleHeader || 'doctor',
+      patientId: 1,
+      doctorId: 'test_user_uid'
     };
     next();
   } else {

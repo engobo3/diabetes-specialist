@@ -1,5 +1,7 @@
 const { buildDossierPDF } = require('../services/pdfDossierService');
 const db = require('../services/database');
+const { logError } = require('../utils/safeLogger');
+const auditLogger = require('../services/auditLogger');
 
 const exportPatientPDF = async (req, res) => {
     try {
@@ -11,16 +13,32 @@ const exportPatientPDF = async (req, res) => {
             return res.status(404).json({ message: 'Patient not found' });
         }
 
-        // Auth check: requesting user must be the patient themselves or one of their doctors
+        // The route already gates with requireSelfOrRoles({roles:['doctor','admin']}).
+        // We do a second check here that uses the patient record (not just role)
+        // so that a non-treating doctor can't pull another doctor's patients.
         const uid = req.user?.uid;
-        const isPatient = patient.email === req.user?.email;
-        const isDoctor = (patient.doctorIds || []).some(
-            dId => String(dId) === String(uid)
+        const role = req.user?.role;
+        const isAdmin = role === 'admin';
+        const isPatientSelf = patient.email && patient.email === req.user?.email;
+        const isTreatingDoctor = role === 'doctor' && (
+            (patient.doctorIds || []).some(dId => String(dId) === String(uid)) ||
+            (patient.doctorIds || []).some(dId => String(dId) === String(req.user?.doctorId))
         );
 
-        if (!isPatient && !isDoctor) {
+        if (!isAdmin && !isPatientSelf && !isTreatingDoctor) {
             return res.status(403).json({ message: 'Access denied: not authorized to view this patient dossier' });
         }
+
+        // Audit-log every dossier export — exports are high-risk PHI movement.
+        auditLogger.logDataAccess({
+            userId: uid,
+            userRole: role,
+            resourceType: 'patient_dossier_pdf',
+            resourceId: String(patientId),
+            action: 'export',
+            success: true,
+            metadata: { requestId: req.requestId }
+        }).catch(err => console.error('Audit logging failed:', err.message));
 
         // Fetch all data in parallel
         const [vitals, prescriptions, medicalRecords, appointments, documents] = await Promise.all([
@@ -49,7 +67,7 @@ const exportPatientPDF = async (req, res) => {
 
         pdfDoc.pipe(res);
     } catch (error) {
-        console.error('Error generating patient PDF:', error);
+        logError('exportPatientPDF', error, { requestId: req.requestId, patientId: req.params.patientId });
         res.status(500).json({ message: 'Error generating PDF dossier' });
     }
 };

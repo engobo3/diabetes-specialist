@@ -1,10 +1,15 @@
 const request = require('supertest');
 const { app } = require('../server');
 
-// Mock Auth Middleware
+// Mock Auth Middleware — simulate a logged-in doctor for clinical workflow tests.
 jest.mock('../middleware/authMiddleware', () => (req, res, next) => {
     if (req.headers['authorization']) {
-        req.user = { uid: 'doctor_123', email: 'doc@test.com' }; // Simulate logged in doctor
+        req.user = {
+            uid: 'doctor_123',
+            email: 'doc@test.com',
+            role: 'doctor',
+            doctorId: 'doctor_123'
+        };
         next();
     } else {
         res.status(403).json({ message: 'Forbidden' });

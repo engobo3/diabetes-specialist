@@ -1,9 +1,11 @@
 const request = require('supertest');
 const { app } = require('../server'); // Import the app
 
-// Mock the middleware and controller to isolate route config
+// Mock the middleware and controller to isolate route config.
+// Admin role so RBAC checks (requireRole('admin') on POST/DELETE) pass.
 jest.mock('../middleware/authMiddleware', () => (req, res, next) => {
     if (req.headers['authorization']) {
+        req.user = { uid: 'test_admin_uid', email: 'admin@test.com', role: 'admin' };
         next();
     } else {
         res.status(403).json({ message: 'Forbidden' });
@@ -46,14 +48,26 @@ describe('Doctor Routes', () => {
             expect(doctorController.addDoctor).not.toHaveBeenCalled();
         });
 
-        it('POST /api/doctors should pass with token', async () => {
+        it('POST /api/doctors should pass with token and valid body', async () => {
             const res = await request(app)
                 .post('/api/doctors')
                 .set('Authorization', 'Bearer valid_token')
-                .send({ name: 'New Doc' });
+                .send({
+                    name: 'New Doc',
+                    specialty: 'Endocrinology',
+                    city: 'Kinshasa',
+                    contact: { email: 'newdoc@example.com' }
+                });
             expect(res.statusCode).toBe(201);
-            // Note: In a real integration test, this confirms the route is "wired" correctly 
-            // because our mock middleware calls next() ONLY when header is present.
+        });
+
+        it('POST /api/doctors should reject with 400 on missing required fields', async () => {
+            const res = await request(app)
+                .post('/api/doctors')
+                .set('Authorization', 'Bearer valid_token')
+                .send({ name: 'New Doc' }); // missing specialty + city
+            expect(res.statusCode).toBe(400);
+            expect(res.body.error).toBe('Validation Failed');
         });
 
         it('DELETE /api/doctors/:id should fail without token', async () => {

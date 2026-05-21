@@ -1,18 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middleware/authMiddleware');
+const { validateBody, validateParams } = require('../middleware/validationMiddleware');
+const { MessageIdParamSchema } = require('../schemas/common.schema');
+const { MessageBodySchema } = require('../schemas/auth.schema');
 const { getConversationMessages, sendMessage, markMessageAsRead } = require('../controllers/messageController');
 
-// Apply authentication to all routes
 router.use(verifyToken);
 
-// Get messages in a conversation
 router.get('/', getConversationMessages);
 
-// Send a new message
-router.post('/', sendMessage);
+router.post('/',
+    validateBody(MessageBodySchema),
+    sendMessage
+);
 
-// Mark message as read (optional enhancement)
-router.put('/:messageId/read', markMessageAsRead);
+router.put('/:messageId/read',
+    validateParams(MessageIdParamSchema),
+    markMessageAsRead
+);
 
 module.exports = router;

@@ -6,9 +6,12 @@ const { db } = require('../config/firebaseConfig');
 // Mock authentication middleware
 jest.mock('../middleware/authMiddleware', () => {
     return (req, res, next) => {
+        const uid = req.headers['x-user-id'] || 'test_user_123';
         req.user = {
-            uid: req.headers['x-user-id'] || 'test_user_123',
-            email: 'test@example.com'
+            uid,
+            email: 'test@example.com',
+            role: 'doctor',
+            doctorId: uid
         };
         next();
     };

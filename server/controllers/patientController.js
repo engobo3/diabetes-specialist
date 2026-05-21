@@ -2,6 +2,7 @@ const { getPatients, getPatientById, getPatientByEmail, getPatientByPhone, creat
 const { validatePatient } = require('../utils/validation');
 const { generateActivationCode, generateCodeExpiry } = require('../utils/activationCode');
 const emailService = require('../services/emailNotificationService');
+const { logError } = require('../utils/safeLogger');
 
 const getAllPatients = async (req, res) => {
     try {
@@ -21,7 +22,7 @@ const getAllPatients = async (req, res) => {
 
         res.json(patients);
     } catch (error) {
-        console.error(error);
+        logError('getAllPatients', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error reading patient data' });
     }
 };
@@ -34,6 +35,7 @@ const getPatient = async (req, res) => {
         }
         res.json(patient);
     } catch (error) {
+        logError('getPatient', error, { requestId: req.requestId, patientId: req.params.id });
         res.status(500).json({ message: 'Error reading patient data' });
     }
 };
@@ -56,7 +58,7 @@ const getPatientByEmailController = async (req, res) => {
         }
         res.json(patient);
     } catch (error) {
-        console.error("Lookup Error:", error);
+        logError('lookup-patient', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error looking up patient' });
     }
 };
@@ -68,17 +70,17 @@ const getCaregiverPatientsController = async (req, res) => {
 
         // Fetch all patients
         const allPatients = await getPatients();
-        
+
         // Filter for patients where this email is a caregiver
         const managedPatients = allPatients.filter(patient => {
-            return patient.caregivers && 
+            return patient.caregivers &&
                    Array.isArray(patient.caregivers) &&
                    patient.caregivers.some(cg => cg.email === email);
         });
 
         res.json(managedPatients);
     } catch (error) {
-        console.error("Caregiver Lookup Error:", error);
+        logError('lookup-caregiver-patients', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error looking up caregiver patients' });
     }
 };
@@ -109,7 +111,7 @@ const deletePatientVital = async (req, res) => {
         }
         res.status(200).json(result);
     } catch (error) {
-        console.error('Error deleting vital:', error);
+        logError('deleteVital', error, { requestId: req.requestId, patientId: req.params.id });
         res.status(500).json({ message: 'Error deleting vital' });
     }
 };
@@ -150,7 +152,7 @@ const createNewPatient = async (req, res) => {
 
         res.status(201).json({ ...newPatient, activationCode });
     } catch (error) {
-        console.error('Error creating patient:', error);
+        logError('createPatient', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error creating patient' });
     }
 };
@@ -237,7 +239,7 @@ const addDoctorToPatient = async (req, res) => {
         const result = await getPatientById(id);
         res.status(200).json(result);
     } catch (error) {
-        console.error('Error adding doctor to patient:', error);
+        logError('addDoctorToPatient', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error adding doctor to patient' });
     }
 };
@@ -260,7 +262,7 @@ const removeDoctorFromPatient = async (req, res) => {
         const result = await getPatientById(id);
         res.status(200).json(result);
     } catch (error) {
-        console.error('Error removing doctor from patient:', error);
+        logError('removeDoctorFromPatient', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Error removing doctor from patient' });
     }
 };
@@ -314,7 +316,7 @@ const verifyActivationCode = async (req, res) => {
             phone: patient.phone
         });
     } catch (error) {
-        console.error('Activation verification error:', error);
+        logError('verifyActivationCode', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Erreur lors de la vérification' });
     }
 };
@@ -351,7 +353,7 @@ const resendActivationCode = async (req, res) => {
 
         res.json({ success: true, message: 'Nouveau code envoyé' });
     } catch (error) {
-        console.error('Resend activation code error:', error);
+        logError('resendActivationCode', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Erreur lors du renvoi du code' });
     }
 };
@@ -376,7 +378,7 @@ const activatePatient = async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Activate patient error:', error);
+        logError('activatePatient', error, { requestId: req.requestId });
         res.status(500).json({ message: 'Erreur lors de l\'activation' });
     }
 };
