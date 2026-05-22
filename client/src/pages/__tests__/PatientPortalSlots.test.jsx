@@ -269,9 +269,12 @@ describe('AppointmentRequestForm (Slot Booking)', () => {
         const reasonSelect = screen.getByDisplayValue('Sélectionner un motif...');
         fireEvent.change(reasonSelect, { target: { value: 'Suivi régulier' } });
 
-        // Submit
-        const submitBtn = screen.getByText(/Envoyer la demande/i);
-        fireEvent.click(submitBtn);
+        // Submit the form directly. fireEvent.click on a submit button doesn't
+        // reliably trigger the form's onSubmit handler in jsdom (clicks fire on
+        // the button, but the default form submission isn't simulated), so we
+        // dispatch the submit event on the form element itself.
+        const form = screen.getByText(/Envoyer la demande/i).closest('form');
+        fireEvent.submit(form);
 
         await waitFor(() => {
             expect(screen.getByText(/succès/i)).toBeInTheDocument();
@@ -314,7 +317,9 @@ describe('AppointmentRequestForm (Slot Booking)', () => {
         const reasonSelect = screen.getByDisplayValue('Sélectionner un motif...');
         fireEvent.change(reasonSelect, { target: { value: 'Suivi régulier' } });
 
-        fireEvent.click(screen.getByText(/Envoyer la demande/i));
+        // Submit the form directly — see comment in success test above.
+        const form = screen.getByText(/Envoyer la demande/i).closest('form');
+        fireEvent.submit(form);
 
         await waitFor(() => {
             expect(screen.getByText(/réservé/i)).toBeInTheDocument();

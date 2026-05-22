@@ -1,60 +1,175 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #0F766E;
-  --color-primary-light: #14B8A6;
-  --color-primary-dark: #0D9488;
-  --color-accent: #F97316;
-  --color-bg-body: #F8FAFC;
+  /* ── Brand palette ─────────────────────────────────────────────────── */
+  --color-primary: #0F766E;        /* teal-700 */
+  --color-primary-light: #14B8A6;  /* teal-500 */
+  --color-primary-dark: #0D6B62;   /* slightly deeper for hover */
+  --color-primary-50: #F0FDFA;
+  --color-primary-100: #CCFBF1;
+
+  --color-accent: #F97316;         /* orange-500 */
+  --color-accent-light: #FB923C;
+
+  /* Surfaces */
+  --color-bg-body: #F8FAFC;        /* slate-50 */
   --color-bg-card: #FFFFFF;
-  --color-text-main: #1E293B;
-  --color-text-muted: #64748B;
-  --color-border: #E2E8F0;
+  --color-bg-subtle: #F1F5F9;      /* slate-100 */
+  --color-bg-muted: #FAFBFC;       /* extra-light surface for hover/odd rows */
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* Text */
+  --color-text-main: #0F172A;      /* slate-900 — slightly deeper for crisper headings */
+  --color-text-body: #334155;      /* slate-700 — better body contrast */
+  --color-text-muted: #64748B;     /* slate-500 */
+  --color-text-subtle: #94A3B8;    /* slate-400 */
 
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  /* Borders */
+  --color-border: #E2E8F0;         /* slate-200 */
+  --color-border-strong: #CBD5E1;  /* slate-300 */
+  --color-border-subtle: #F1F5F9;  /* slate-100 — barely-there borders */
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  /* ── Elevation (multi-layered, modern soft shadows) ────────────────── */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 4px 8px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 4px 8px -2px rgb(15 23 42 / 0.05), 0 10px 24px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 8px 16px -4px rgb(15 23 42 / 0.06), 0 24px 48px -8px rgb(15 23 42 / 0.12);
+  --shadow-glow: 0 0 0 4px rgb(15 118 110 / 0.12);
+  --shadow-ring: 0 0 0 3px rgb(15 118 110 / 0.18);
+
+  /* ── Radius ────────────────────────────────────────────────────────── */
+  --radius-sm: 0.375rem;   /* 6px  */
+  --radius-md: 0.5rem;     /* 8px  */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.25rem;   /* 20px */
+
+  /* ── Typography ────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 :root {
-  /* Keep variables for runtime usage in JS if needed, though Tailwind theme covers CSS */
+  /* JS-readable mirrors of the theme tokens */
   --primary: #0F766E;
   --primary-light: #14B8A6;
-  --primary-dark: #0D9488;
+  --primary-dark: #0D6B62;
   --accent: #F97316;
   --bg-body: #F8FAFC;
   --bg-card: #FFFFFF;
-  --text-main: #1E293B;
+  --text-main: #0F172A;
   --text-muted: #64748B;
   --border: #E2E8F0;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* Dark Mode Support (Basic) */
-/* Dark Mode Removed for Medical Light Theme Consistency */
+/* Medical light theme — dark mode intentionally not supported. */
+
+html {
+  /* Smooth fonts on macOS/iOS and crisp on Windows */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
 
 body {
   background-color: var(--bg-body);
   color: var(--text-main);
-  @apply antialiased;
   font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Inter stylistic sets — subtle modern character */
+  line-height: 1.5;
 }
 
-/* Component Classes */
+/* Headings: tighter tracking, balanced wrapping (Tailwind 3.4+ supports text-wrap: balance) */
+h1, h2, h3, h4 {
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+/* Modern accessible focus ring — only for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Subtle scrollbar styling (WebKit) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225 / 0.6);
+  border-radius: 8px;
+  border: 2px solid var(--bg-body);
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184 / 0.8); }
+
+/* Disable text selection on UI affordances (badges, buttons) — not on content */
+button, [role="button"], .badge {
+  user-select: none;
+}
+
+/* ── Reusable utility classes (used by legacy markup) ───────────────── */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-md font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200;
   }
 
   .btn-primary {
-    @apply bg-primary text-white shadow-sm hover:bg-primary-dark hover:-translate-y-px;
+    @apply bg-primary text-white shadow-sm hover:bg-primary-dark active:scale-[0.98];
+    transition-timing-function: var(--ease-out);
   }
 
   .card {
-    @apply bg-bg-card rounded-lg p-6 shadow-md border border-border;
+    @apply bg-bg-card rounded-xl p-6 border border-border;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+
+  .card-hoverable:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  /* Subtle surface for nested sections (e.g. inside a Card) */
+  .surface-subtle {
+    @apply bg-bg-subtle rounded-lg border border-border-subtle;
+  }
+}
+
+/* ── Animations ─────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in { animation: fade-in 280ms var(--ease-out); }
+
+/* Modern skeleton shimmer (replaces plain pulse for a higher-fidelity feel) */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(226 232 240 / 0.6) 0%,
+    rgb(241 245 249 / 0.9) 50%,
+    rgb(226 232 240 / 0.6) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Respect reduced-motion preference — disable lift/transform animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

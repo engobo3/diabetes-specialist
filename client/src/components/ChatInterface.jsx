@@ -14,51 +14,68 @@ const ChatInterface = ({ currentUser, contactId, contactName, isSpecialist = fal
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    const fetchMessages = async () => {
-        // Robust Auth Check: Use global auth object if prop fails
-        const safeUser = auth.currentUser || currentUser;
+    // Mounted ref so setState after unmount is a no-op. Without this, the 5s
+    // polling interval could fire setMessages on a torn-down component if the
+    // user navigates away during an in-flight fetch.
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
+    const fetchMessages = async (signal) => {
+        const safeUser = auth.currentUser || currentUser;
         if (!safeUser) return;
 
         try {
-            setError(null);
+            if (mountedRef.current) setError(null);
             const token = await safeUser.getIdToken();
 
-            // Use props for IDs if available (important for Doctor ID 99 vs Auth ID)
             const myId = customSenderId || (currentUser?.publicId) || safeUser.uid;
-
-            // Always pass contactId to get the conversation between these two participants
             const targetId = contactId;
-
             if (!targetId) {
-                setError('Invalid conversation - no contact ID provided');
-                setLoading(false);
+                if (mountedRef.current) {
+                    setError('Invalid conversation - no contact ID provided');
+                    setLoading(false);
+                }
                 return;
             }
 
-            // Pass senderId when using custom ID (doctor app ID vs Firebase UID)
             const senderParam = myId !== safeUser.uid ? `&senderId=${myId}` : '';
-            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages?contactId=${targetId}${senderParam}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetch(
+                `${import.meta.env.VITE_API_URL || ''}/api/messages?contactId=${targetId}${senderParam}`,
+                { headers: { 'Authorization': `Bearer ${token}` }, signal }
+            );
             if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.message || "Failed to fetch");
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || errorData.error || `Failed to fetch (${res.status})`);
             }
             const data = await res.json();
+            if (!mountedRef.current) return;
             setMessages(data);
             setLoading(false);
         } catch (err) {
+            if (err.name === 'AbortError') return;
             console.error("Error fetching messages", err);
-            setError(err.message || "Failed to load messages");
-            setLoading(false);
+            if (mountedRef.current) {
+                setError(err.message || "Failed to load messages");
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        const interval = setInterval(fetchMessages, 5000);
-        fetchMessages(); // Initial fetch
-        return () => clearInterval(interval);
+        const ac = new AbortController();
+        fetchMessages(ac.signal); // Initial fetch
+        // Poll every 5s. A new AbortController per interval tick would be ideal,
+        // but since fetchMessages itself guards setState via mountedRef and the
+        // outer signal aborts both, this is sufficient.
+        const interval = setInterval(() => fetchMessages(ac.signal), 5000);
+        return () => {
+            clearInterval(interval);
+            ac.abort();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contactId, currentUser, isSpecialist, customSenderId]);
 
     useEffect(() => {

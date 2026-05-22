@@ -7,18 +7,18 @@ const Sidebar = ({ navGroups, activeTab, onTabChange, isOpen, onClose, headerCon
     };
 
     const NavContent = () => (
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+        <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-7">
             {headerContent && (
-                <div className="px-2 pb-4 border-b border-gray-100">
+                <div className="px-2 pb-4 border-b border-slate-100">
                     {headerContent}
                 </div>
             )}
             {navGroups.map((group) => (
                 <div key={group.label}>
-                    <p className="px-3 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    <p className="px-3 mb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-[0.08em]">
                         {group.label}
                     </p>
-                    <ul className="space-y-1">
+                    <ul className="space-y-0.5">
                         {group.items.map((item) => {
                             const Icon = item.icon;
                             const isActive = activeTab === item.id;
@@ -26,16 +26,33 @@ const Sidebar = ({ navGroups, activeTab, onTabChange, isOpen, onClose, headerCon
                                 <li key={item.id}>
                                     <button
                                         onClick={() => handleItemClick(item.id)}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                                        aria-current={isActive ? 'page' : undefined}
+                                        className={[
+                                            'group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium',
+                                            'transition-all duration-200 ease-out-expo min-h-[44px]',
                                             isActive
-                                                ? 'bg-primary/10 text-primary shadow-sm'
-                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                        }`}
+                                                ? 'bg-gradient-to-r from-primary/12 to-primary/5 text-primary shadow-xs'
+                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                        ].join(' ')}
                                     >
-                                        <Icon size={20} className={isActive ? 'text-primary' : 'text-gray-400'} />
+                                        {/* Active indicator bar */}
+                                        {isActive && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-primary"
+                                            />
+                                        )}
+                                        <Icon
+                                            size={20}
+                                            className={`shrink-0 transition-colors ${
+                                                isActive
+                                                    ? 'text-primary'
+                                                    : 'text-slate-400 group-hover:text-slate-600'
+                                            }`}
+                                        />
                                         <span className="truncate">{item.label}</span>
                                         {item.badge != null && item.badge > 0 && (
-                                            <span className="ml-auto bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                            <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-accent text-white text-[11px] font-bold rounded-full shadow-xs">
                                                 {item.badge}
                                             </span>
                                         )}
@@ -52,7 +69,7 @@ const Sidebar = ({ navGroups, activeTab, onTabChange, isOpen, onClose, headerCon
     return (
         <>
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:top-16 lg:left-0 bg-white border-r border-gray-200 z-20">
+            <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:top-16 lg:left-0 bg-white border-r border-slate-200/80 z-20">
                 <NavContent />
             </aside>
 
@@ -60,15 +77,21 @@ const Sidebar = ({ navGroups, activeTab, onTabChange, isOpen, onClose, headerCon
             {isOpen && (
                 <div className="lg:hidden fixed inset-0 z-50">
                     <div
-                        className="absolute inset-0 bg-black/40"
+                        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in-up"
                         onClick={onClose}
+                        aria-hidden="true"
                     />
-                    <aside className="absolute top-0 left-0 bottom-0 w-72 bg-white shadow-lg animate-slide-in-left flex flex-col">
-                        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-                            <span className="text-lg font-bold text-primary">Menu</span>
+                    <aside
+                        className="absolute top-0 left-0 bottom-0 w-72 bg-white shadow-xl animate-slide-in-left flex flex-col"
+                        role="dialog"
+                        aria-label="Navigation"
+                    >
+                        <div className="flex items-center justify-between px-4 py-4 border-b border-slate-100">
+                            <span className="text-base font-bold text-primary tracking-tight">Menu</span>
                             <button
                                 onClick={onClose}
-                                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                                aria-label="Close menu"
+                                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
                             >
                                 <X size={20} />
                             </button>

@@ -12,7 +12,8 @@ vi.mock('../../context/AuthContext', () => ({
 
 import { useAuth } from '../../context/AuthContext';
 
-// --- Mock lucide-react icons ---
+// --- Mock lucide-react icons used by NotificationBell ---
+// NotificationBell imports: Bell, Check, CheckCheck, Calendar, Activity, AlertCircle, Clock
 vi.mock('lucide-react', () => ({
     Bell: (props) => <span data-testid="bell-icon" {...props}>Bell</span>,
     Check: (props) => <span {...props}>Check</span>,
@@ -20,6 +21,7 @@ vi.mock('lucide-react', () => ({
     Calendar: (props) => <span {...props}>Calendar</span>,
     Activity: (props) => <span {...props}>Activity</span>,
     AlertCircle: (props) => <span {...props}>AlertCircle</span>,
+    Clock: (props) => <span {...props}>Clock</span>,
 }));
 
 // --- Mock fetch ---

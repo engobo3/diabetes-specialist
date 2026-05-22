@@ -43,41 +43,80 @@ const PatientDetails = () => {
     const [allDoctors, setAllDoctors] = useState([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState('');
 
+    useEffect(() => {
+        if (!currentUser) return;
+
+        // Abort in-flight requests on unmount or when id/currentUser change.
+        // Without this, the six setState calls below would fire on an unmounted
+        // component if the user navigated away mid-load (React 18 warns;
+        // the orphaned fetches also leaked bandwidth).
+        const ac = new AbortController();
+        const signal = ac.signal;
+
+        (async () => {
+            try {
+                const token = await currentUser.getIdToken();
+                const headers = { 'Authorization': `Bearer ${token}` };
+                const base = import.meta.env.VITE_API_URL;
+
+                const [patientData, vitalsData, prescriptionsData, appointmentsData, documentsData, medicalRecordsData] = await Promise.all([
+                    fetch(`${base}/api/patients/${id}`, { headers, signal }).then(res => res.json()),
+                    fetch(`${base}/api/patients/${id}/vitals`, { headers, signal }).then(res => res.json()),
+                    fetch(`${base}/api/prescriptions/${id}`, { headers, signal }).then(res => res.json()),
+                    fetch(`${base}/api/appointments`, { headers, signal }).then(res => res.json()),
+                    fetch(`${base}/api/patients/${id}/documents`, { headers, signal }).then(res => res.json()),
+                    fetch(`${base}/api/medical-records/patient/${id}`, { headers, signal }).then(res => res.ok ? res.json() : [])
+                ]);
+
+                if (signal.aborted) return; // Belt-and-suspenders
+
+                setPatient(patientData);
+                setPhone(patientData.phone || '');
+                setVitals(vitalsData);
+                setPrescriptions(prescriptionsData);
+                setAppointments(appointmentsData.filter(a => String(a.patientId) === String(id)));
+                setDocuments(Array.isArray(documentsData) ? documentsData : []);
+                setMedicalRecords(Array.isArray(medicalRecordsData) ? medicalRecordsData : []);
+                setLoading(false);
+            } catch (err) {
+                if (err.name === 'AbortError') return; // Expected on unmount
+                console.error("Error fetching data", err);
+                setLoading(false);
+            }
+        })();
+
+        return () => ac.abort();
+    }, [id, currentUser]);
+
+    // fetchData kept as a callable for refresh flows (vital add, document upload, etc.)
     const fetchData = async () => {
         if (!currentUser) return;
         try {
             const token = await currentUser.getIdToken();
             const headers = { 'Authorization': `Bearer ${token}` };
+            const base = import.meta.env.VITE_API_URL;
 
             const [patientData, vitalsData, prescriptionsData, appointmentsData, documentsData, medicalRecordsData] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/vitals`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/${id}`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/appointments`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/patients/${id}/documents`, { headers }).then(res => res.json()),
-                fetch(`${import.meta.env.VITE_API_URL}/api/medical-records/patient/${id}`, { headers }).then(res => res.ok ? res.json() : [])
+                fetch(`${base}/api/patients/${id}`, { headers }).then(res => res.json()),
+                fetch(`${base}/api/patients/${id}/vitals`, { headers }).then(res => res.json()),
+                fetch(`${base}/api/prescriptions/${id}`, { headers }).then(res => res.json()),
+                fetch(`${base}/api/appointments`, { headers }).then(res => res.json()),
+                fetch(`${base}/api/patients/${id}/documents`, { headers }).then(res => res.json()),
+                fetch(`${base}/api/medical-records/patient/${id}`, { headers }).then(res => res.ok ? res.json() : [])
             ]);
 
             setPatient(patientData);
             setPhone(patientData.phone || '');
             setVitals(vitalsData);
             setPrescriptions(prescriptionsData);
-            const patientApps = appointmentsData.filter(a => String(a.patientId) === String(id));
-            setAppointments(patientApps);
+            setAppointments(appointmentsData.filter(a => String(a.patientId) === String(id)));
             setDocuments(Array.isArray(documentsData) ? documentsData : []);
             setMedicalRecords(Array.isArray(medicalRecordsData) ? medicalRecordsData : []);
             setLoading(false);
         } catch (err) {
-            console.error("Error fetching data", err);
-            setLoading(false);
+            console.error("Error refreshing data", err);
         }
     };
-
-    useEffect(() => {
-        if (currentUser) {
-            fetchData();
-        }
-    }, [id, currentUser]);
 
     // Fetch specialty config once patient is loaded
     useEffect(() => {

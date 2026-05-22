@@ -1,9 +1,14 @@
 import React from 'react';
 
-const Skeleton = ({ className = '', ...props }) => {
+/**
+ * Skeleton — modern shimmer (instead of plain pulse) for higher-fidelity loading.
+ * Falls back to a soft pulse if motion is reduced (handled in index.css).
+ */
+const Skeleton = ({ className = '', shimmer = true, ...props }) => {
+    const motion = shimmer ? 'skeleton-shimmer' : 'animate-pulse bg-slate-200/70';
     return (
         <div
-            className={`animate-pulse rounded-md bg-gray-200 ${className}`}
+            className={`rounded-md ${motion} ${className}`}
             {...props}
         />
     );
