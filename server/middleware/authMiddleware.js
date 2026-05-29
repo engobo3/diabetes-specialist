@@ -1,5 +1,17 @@
 const admin = require('firebase-admin');
+const userService = require('../services/userService');
 
+/**
+ * Verify the Firebase ID token in the Authorization header and enrich
+ * req.user with role + profile foreign keys.
+ *
+ * Phase 2 change: the enrichment lookup now goes through userService, which
+ * tries Postgres first and falls back to Firestore. The req.user shape is
+ * unchanged for downstream middleware/controllers — `role`, `patientId`,
+ * `doctorId` continue to be the read keys. We additionally set
+ * `req.user.userId` (the Postgres uuid, may be null during the cutover window)
+ * and `req.user._userSource` ('postgres' | 'firestore') for observability.
+ */
 const verifyToken = async (req, res, next) => {
     const bearerHeader = req.headers['authorization'];
 
@@ -19,20 +31,21 @@ const verifyToken = async (req, res, next) => {
         const decodedToken = await admin.auth().verifyIdToken(token);
         req.user = decodedToken;
 
-        // Enrich req.user with role, patientId, doctorId from Firestore
+        // Enrich req.user with role, patientId, doctorId via userService
+        // (Postgres-first, Firestore-fallback). Non-fatal on failure.
         try {
-            const { db } = require('../config/firebaseConfig');
-            if (db) {
-                const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    req.user.role = userData.role || null;
-                    req.user.patientId = userData.patientId || null;
-                    req.user.doctorId = userData.doctorId || null;
-                }
+            const userRecord = await userService.lookupUserByFirebaseUid(decodedToken.uid);
+            if (userRecord) {
+                req.user.role = userRecord.role;
+                req.user.patientId = userRecord.patientId;
+                req.user.doctorId = userRecord.doctorId;
+                req.user.userId = userRecord.id;                  // Postgres uuid, may be null during cutover
+                req.user.preferredLanguage = userRecord.preferredLanguage;
+                req.user.regionId = userRecord.regionId;
+                req.user._userSource = userRecord.source;          // 'postgres' | 'firestore' — observability
             }
         } catch (enrichError) {
-            // Non-fatal: proceed with base token data if Firestore lookup fails
+            // Non-fatal: proceed with base token data if enrichment fails
             console.warn('Could not enrich user token with role data:', enrichError.message);
         }
 
