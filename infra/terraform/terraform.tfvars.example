@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and fill in. NEVER commit terraform.tfvars.
+
+environment           = "staging"           # staging | production
+vpc_id                = "vpc-xxxxxxxx"
+private_subnet_ids    = ["subnet-aaaa", "subnet-bbbb"]   # >= 2 AZs
+app_security_group_id = "sg-xxxxxxxx"        # the app tier's SG
+
+# Optional: a tight admin CIDR for running migrations from a bastion.
+# Leave empty in production if migrations run from inside the VPC.
+admin_cidr_blocks = []
+
+# Defaults are fine for launch; override as you scale.
+# instance_class        = "db.t4g.small"
+# engine_version        = "16.4"
+# allocated_storage     = 20
+# max_allocated_storage = 100
+# multi_az              = false             # set true before production scale-up
+# deletion_protection   = true
+# kms_key_arn           = null              # set a CMK ARN for column-encryption parity
