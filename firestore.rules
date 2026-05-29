@@ -57,8 +57,12 @@ service cloud.firestore {
 
     // Doctors collection
     match /doctors/{doctorId} {
-      // Public read for doctor discovery
-      allow read: if true;
+      // Authenticated read only. Public doctor discovery is served by the
+      // GET /api/doctors endpoint (server-side via firebase-admin, which
+      // bypasses these rules and returns curated fields), so the browser never
+      // needs unauthenticated direct Firestore access. Previously `if true`,
+      // which unintentionally exposed every doctor document to the public.
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isOwner(doctorId) || isAdmin();
       allow delete: if isAdmin();
