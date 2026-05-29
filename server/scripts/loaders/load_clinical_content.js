@@ -26,32 +26,12 @@
 'use strict';
 
 require('dotenv').config();
-const crypto = require('crypto');
 const readline = require('readline');
+// Shared with glucoseService so live dual-writes and the loader produce the
+// SAME client_uuid for a given Firestore record (cross-path idempotency).
+const { deterministicUuid } = require('../../utils/deterministicUuid');
 
 const MODES = new Set(['dry-run', 'verify', 'apply']);
-
-// Fixed namespace so deterministic UUIDs are stable across runs/machines.
-const MIGRATION_NS = '8f2b1c4e-3a5d-4e6f-9b0a-1c2d3e4f5a6b';
-
-// ─────────────────────────────────────────────────────────────────────
-// Deterministic UUID (RFC-4122 v5-style: SHA1 of namespace + name)
-// ─────────────────────────────────────────────────────────────────────
-
-function deterministicUuid(...parts) {
-    const name = parts.map(String).join(':');
-    const hash = crypto.createHash('sha1')
-        .update(MIGRATION_NS)
-        .update(':')
-        .update(name)
-        .digest('hex');
-    // Take first 16 bytes; set version (5) and variant (RFC 4122) bits.
-    const bytes = Buffer.from(hash.slice(0, 32), 'hex');
-    bytes[6] = (bytes[6] & 0x0f) | 0x50;   // version 5
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;   // variant 10xx
-    const h = bytes.toString('hex');
-    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // Arg parsing / prompt

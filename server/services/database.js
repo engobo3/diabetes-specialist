@@ -97,7 +97,19 @@ const getVitals = async (patientId) => {
 };
 
 const addVital = async (patientId, vitalData) => {
-    return vitalRepo.add(patientId, vitalData);
+    const saved = await vitalRepo.add(patientId, vitalData);
+    // Glucose cutover (expand phase): best-effort dual-write of glucose
+    // readings into Postgres glucose_readings. No-ops without RDS or for
+    // patients not yet migrated; never blocks or fails the Firestore write.
+    try {
+        const glucoseService = require('./glucoseService');
+        Promise.resolve(
+            glucoseService.dualWriteFromVital(patientId, vitalData, saved?.id || null)
+        ).catch(() => {});
+    } catch (e) {
+        /* glucoseService is optional during early cutover */
+    }
+    return saved;
 };
 
 const deleteVital = async (patientId, vitalId) => {
