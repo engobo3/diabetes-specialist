@@ -1,5 +1,6 @@
 const caregiverService = require('../services/caregiverService');
 const { safeErrorMessage } = require('../utils/safeError');
+const { logError, logWarn } = require('../utils/safeLogger');
 
 /**
  * POST /api/caregivers/invite
@@ -36,13 +37,13 @@ const inviteCaregiver = async (req, res) => {
         text: `Bonjour,\n\nVous avez été invité(e) comme aidant sur GlucoSoin.\n\nRelation: ${relationship || 'Non spécifiée'}\n\nCliquez sur le lien suivant pour accepter l'invitation:\n${inviteUrl}\n\n--\nGlucoSoin`
       });
     } catch (emailErr) {
-      console.warn('Failed to send caregiver invitation email:', emailErr.message);
+      logWarn('caregiver invite email failed', emailErr.message, { patientId });
       // Non-fatal: invitation still created
     }
 
     res.status(201).json(invitation);
   } catch (error) {
-    console.error('Error creating invitation:', error);
+    logError('inviteCaregiver failed', error, { patientId: req.body?.patientId, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error creating invitation') });
   }
 };
@@ -57,7 +58,7 @@ const getInvitationByToken = async (req, res) => {
     const invitation = await caregiverService.getInvitationByToken(token);
     res.json(invitation);
   } catch (error) {
-    console.error('Error fetching invitation:', error);
+    logError('getInvitationByToken failed', error, { userId: req.user?.uid });
     res.status(404).json({ message: error.message || 'Invitation not found' });
   }
 };
@@ -77,7 +78,7 @@ const getPendingInvitations = async (req, res) => {
     const invitations = await caregiverService.getPendingInvitations(email);
     res.json(invitations);
   } catch (error) {
-    console.error('Error fetching pending invitations:', error);
+    logError('getPendingInvitations failed', error, { userId: req.user?.uid });
     res.status(500).json({ message: 'Error fetching invitations' });
   }
 };
@@ -98,7 +99,7 @@ const getPatientInvitations = async (req, res) => {
     const invitations = await caregiverService.getPatientInvitations(patientId);
     res.json(invitations);
   } catch (error) {
-    console.error('Error fetching patient invitations:', error);
+    logError('getPatientInvitations failed', error, { patientId: req.params?.patientId, userId: req.user?.uid });
     res.status(500).json({ message: 'Error fetching invitations' });
   }
 };
@@ -119,7 +120,7 @@ const getPendingApprovalsForDoctor = async (req, res) => {
     const invitations = await caregiverService.getPendingApprovalsForDoctor(doctorId);
     res.json(invitations);
   } catch (error) {
-    console.error('Error fetching pending approvals:', error);
+    logError('getPendingApprovalsForDoctor failed', error, { userId: req.user?.uid });
     res.status(500).json({ message: 'Error fetching approvals' });
   }
 };
@@ -140,7 +141,7 @@ const acceptInvitation = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error accepting invitation:', error);
+    logError('acceptInvitation failed', error, { invitationId: req.params?.id, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error accepting invitation') });
   }
 };
@@ -155,7 +156,7 @@ const rejectInvitation = async (req, res) => {
     const result = await caregiverService.rejectInvitation(id);
     res.json(result);
   } catch (error) {
-    console.error('Error rejecting invitation:', error);
+    logError('rejectInvitation failed', error, { invitationId: req.params?.id, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error rejecting invitation') });
   }
 };
@@ -173,7 +174,7 @@ const cancelInvitation = async (req, res) => {
     const result = await caregiverService.cancelInvitation(id);
     res.json(result);
   } catch (error) {
-    console.error('Error cancelling invitation:', error);
+    logError('cancelInvitation failed', error, { invitationId: req.params?.id, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error cancelling invitation') });
   }
 };
@@ -197,7 +198,7 @@ const approveInvitation = async (req, res) => {
     const result = await caregiverService.approveInvitation(id, approved, doctorId, notes);
     res.json(result);
   } catch (error) {
-    console.error('Error approving invitation:', error);
+    logError('approveInvitation failed', error, { invitationId: req.params?.id, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error approving invitation') });
   }
 };
@@ -218,7 +219,7 @@ const getPatientCaregivers = async (req, res) => {
     const caregivers = await caregiverService.getPatientCaregivers(patientId);
     res.json(caregivers);
   } catch (error) {
-    console.error('Error fetching caregivers:', error);
+    logError('getPatientCaregivers failed', error, { patientId: req.params?.patientId, userId: req.user?.uid });
     res.status(500).json({ message: 'Error fetching caregivers' });
   }
 };
@@ -245,7 +246,7 @@ const updateCaregiverPermissions = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error updating permissions:', error);
+    logError('updateCaregiverPermissions failed', error, { patientId: req.params?.patientId, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error updating permissions') });
   }
 };
@@ -266,7 +267,7 @@ const removeCaregiver = async (req, res) => {
     const result = await caregiverService.removeCaregiver(patientId, caregiverEmail);
     res.json(result);
   } catch (error) {
-    console.error('Error removing caregiver:', error);
+    logError('removeCaregiver failed', error, { patientId: req.params?.patientId, userId: req.user?.uid });
     res.status(400).json({ message: safeErrorMessage(error, 'Error removing caregiver') });
   }
 };

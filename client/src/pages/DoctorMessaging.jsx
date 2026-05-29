@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChatInterface from '../components/ChatInterface';
 import { useAuth } from '../context/AuthContext';
 import { Mail, ArrowLeft } from 'lucide-react';
@@ -10,26 +10,42 @@ const DoctorMessaging = () => {
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [showSidebar, setShowSidebar] = useState(true);
     const [loading, setLoading] = useState(true);
+    const mountedRef = useRef(true);
 
     useEffect(() => {
+        mountedRef.current = true;
+        const controller = new AbortController();
+
         const fetchPatients = async () => {
             if (!doctorProfile?.id || !currentUser) return;
             try {
                 const token = await currentUser.getIdToken();
-                const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(
+                    `${import.meta.env.VITE_API_URL || ''}/api/patients?doctorId=${doctorProfile.id}`,
+                    {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        signal: controller.signal
+                    }
+                );
+                if (!mountedRef.current) return;
                 if (response.ok) {
                     const data = await response.json();
-                    setPatients(data);
+                    if (mountedRef.current) setPatients(data);
                 }
             } catch (err) {
+                if (err.name === 'AbortError') return; // expected on unmount
+                if (!mountedRef.current) return;
                 console.error("Failed to fetch patients", err);
             } finally {
-                setLoading(false);
+                if (mountedRef.current) setLoading(false);
             }
         };
         fetchPatients();
+
+        return () => {
+            mountedRef.current = false;
+            controller.abort();
+        };
     }, [doctorProfile, currentUser]);
 
     return (
