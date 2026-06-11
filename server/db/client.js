@@ -136,6 +136,31 @@ async function healthcheck() {
     }
 }
 
+/**
+ * Run `fn(client)` inside a transaction. COMMIT on resolve, ROLLBACK on throw.
+ * Returns `{ _skipped: true }` when the pool isn't configured (same contract
+ * as query()), so callers like the reminder dispatcher can no-op gracefully.
+ *
+ * Needed for FOR UPDATE SKIP LOCKED flows where the row claim and the status
+ * update must share one transaction.
+ */
+async function withTransaction(fn) {
+    const pool = getPool();
+    if (!pool) return { _skipped: true };
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (err) {
+        try { await client.query('ROLLBACK'); } catch (rollbackErr) { /* connection gone */ }
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
 async function shutdown() {
     if (_pool) {
         await _pool.end();
@@ -143,4 +168,4 @@ async function shutdown() {
     }
 }
 
-module.exports = { getPool, query, healthcheck, shutdown };
+module.exports = { getPool, query, withTransaction, healthcheck, shutdown };

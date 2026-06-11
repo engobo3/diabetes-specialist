@@ -110,6 +110,7 @@ app.use('/api/doctor-events', require('./routes/doctorEventRoutes'));
 app.use('/api/notification-preferences', require('./routes/notificationPreferencesRoutes'));
 app.use('/api/medication-schedules', require('./routes/medicationScheduleRoutes'));
 app.use('/api/sync', require('./routes/syncRoutes'));
+app.use('/api/reminders', require('./routes/reminderRoutes'));
 
 // Global error handler — must be after all route mounts.
 // Never leak stack traces, request bodies, or upstream error details to the
@@ -494,6 +495,48 @@ exports.retentionWeekly = onSchedule({
         console.log('retentionWeekly result:', JSON.stringify(result));
     } catch (error) {
         console.error('retentionWeekly error:', error.message);
+    }
+});
+
+// ── Phase 5: Postgres-backed medication reminders ──────────────────────
+// Both gated by REMINDERS_PG (default off). While off, the legacy
+// medicationReminder cron above keeps serving users; flipping the flag on
+// (after RDS + loaders are verified) must coincide with disabling the legacy
+// cron, or migrated schedules would notify twice.
+//
+// pg-boss note: the brief calls for pg-boss, but Cloud Functions are ephemeral
+// and can't host its persistent polling worker. These onSchedule triggers call
+// the same service functions a pg-boss worker would; a worker.js runner gets
+// added when the standalone af-south-1 deployment exists.
+
+// Hourly: pre-generate reminder rows for the next 14 days (idempotent).
+exports.reminderGenerationHourly = onSchedule({
+    schedule: '0 * * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    if (process.env.REMINDERS_PG !== 'on') return;
+    try {
+        const result = await require('./services/reminderService').generateUpcoming();
+        console.log('reminderGenerationHourly:', JSON.stringify(result));
+    } catch (error) {
+        console.error('reminderGenerationHourly error:', error.message);
+    }
+});
+
+// Per-minute: dispatch due reminders (FOR UPDATE SKIP LOCKED), then sweep
+// >6h-stale pending rows to 'missed'.
+exports.reminderDispatchEveryMinute = onSchedule({
+    schedule: '* * * * *',
+    timeZone: 'Africa/Kinshasa'
+}, async () => {
+    if (process.env.REMINDERS_PG !== 'on') return;
+    try {
+        const reminderService = require('./services/reminderService');
+        const dispatched = await reminderService.dispatchDue();
+        const swept = await reminderService.sweepStale();
+        console.log('reminderDispatchEveryMinute:', JSON.stringify({ dispatched, swept }));
+    } catch (error) {
+        console.error('reminderDispatchEveryMinute error:', error.message);
     }
 });
 
