@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { onForegroundMessage } from './firebase';
+import { startAutoFlush, isEnabled as offlineSyncEnabled } from './offline/syncEngine';
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -81,6 +82,19 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
+/**
+ * Drives the offline-sync auto-flush loop for the logged-in user. Renders
+ * nothing. No-op unless VITE_OFFLINE_SYNC=on — Phase 4a ships inert.
+ */
+const OfflineSyncManager = () => {
+    const { currentUser } = useAuth();
+    useEffect(() => {
+        if (!offlineSyncEnabled() || !currentUser) return undefined;
+        return startAutoFlush(() => currentUser.getIdToken());
+    }, [currentUser]);
+    return null;
+};
+
 function App() {
     // Listen for foreground push messages and show toast
     useEffect(() => {
@@ -109,6 +123,7 @@ function App() {
         >
             <LanguageProvider>
             <AuthProvider>
+                <OfflineSyncManager />
                 <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
                 <Router>
                     <Suspense fallback={<LoadingSpinner />}>

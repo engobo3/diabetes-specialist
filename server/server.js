@@ -109,6 +109,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/doctor-events', require('./routes/doctorEventRoutes'));
 app.use('/api/notification-preferences', require('./routes/notificationPreferencesRoutes'));
 app.use('/api/medication-schedules', require('./routes/medicationScheduleRoutes'));
+app.use('/api/sync', require('./routes/syncRoutes'));
 
 // Global error handler — must be after all route mounts.
 // Never leak stack traces, request bodies, or upstream error details to the
